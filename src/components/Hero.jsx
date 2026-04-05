@@ -64,7 +64,7 @@ export default function Hero() {
               </Link>
               <Link href="/explore">
                 <button className="flex items-center gap-2 bg-white text-emerald-900 border-2 border-emerald-200 px-8 py-4 rounded-full font-bold hover:bg-emerald-50 transition-all">
-                  Mushroom Hub
+                  Mushroom Mania
                 </button>
               </Link>
             </div>

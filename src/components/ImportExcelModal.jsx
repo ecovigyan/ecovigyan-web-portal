@@ -14,43 +14,54 @@ export function ImportExcelModal({ isOpen, onClose, onImport }) {
     const file = event.target.files?.[0];
     if (file) {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      if (['xlsx', 'xls', 'csv'].includes(fileExtension)) {
         setSelectedFile(file);
       } else {
-        toast.error('Please select a valid Excel file (.xlsx or .xls)');
+        toast.error('Please select a valid Excel (.xlsx, .xls) or CSV file');
       }
     }
   };
 
-  const downloadTemplate = () => {
-    // Create a simple CSV template as a fallback
-    const headers = ['Photo/Image', 'Latitude', 'Longitude', 'Name', 'Location', 'Stem', 'Bottom/Underside', 'Texture', 'Role', 'Use', 'Description'];
-    const sampleRow = [
-      'https://drive.google.com/file/d/YOUR_FILE_ID/view',
-      '19.0760',
-      '72.8777',
-      'Button Mushroom',
-      'Mumbai, Maharashtra',
-      'has-stem',
-      'gills',
-      'soft-to-touch',
-      'decomposer',
-      'edible',
-      'Found in urban garden'
+  const downloadTemplate = async () => {
+    const { utils, write } = await import('xlsx');
+
+    const headers = [
+      'Photo/Image Link', 'Latitude', 'Longitude',
+      'Common Name', 'Scientific Name',
+      'Stem Presence', 'Underside', 'Texture',
+      'Ecological Role', 'Common Uses',
     ];
-    
-    const csvContent = [headers.join(','), sampleRow.join(',')].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const rows = [
+      [
+        'https://drive.google.com/file/d/YOUR_FILE_ID/view',
+        19.0760, 72.8777,
+        'Button Mushroom', 'Agaricus bisporus',
+        'has-stem', 'gills', 'soft-to-touch', 'decomposer', 'edible',
+      ],
+      [
+        'https://drive.google.com/file/d/ANOTHER_FILE_ID/view',
+        28.6139, 77.2090,
+        'Oyster Mushroom', 'Pleurotus ostreatus',
+        'has-no-stem', 'gills', 'soft-to-touch', 'decomposer', 'edible',
+      ],
+    ];
+
+    const ws = utils.aoa_to_sheet([headers, ...rows]);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Mushrooms');
+
+    const buf = write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mushroom_import_template.csv';
+    a.download = 'mushroom_import_template.xlsx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
-    toast.success('Template downloaded! (CSV format)');
+
+    toast.success('Template downloaded!');
   };
 
   const handleImport = async () => {
@@ -187,13 +198,13 @@ export function ImportExcelModal({ isOpen, onClose, onImport }) {
             {/* File Upload */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Excel File (.xlsx, .xls)
+                Excel or CSV File (.xlsx, .xls, .csv)
               </label>
               <div className="relative">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xls,.csv"
                   onChange={handleFileSelect}
                   disabled={isProcessing}
                   className="block w-full text-sm text-gray-900 border border-gray-300 rounded-xl cursor-pointer bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent p-3 disabled:opacity-50"
@@ -212,55 +223,37 @@ export function ImportExcelModal({ isOpen, onClose, onImport }) {
               <h3 className="text-lg font-bold text-purple-900 mb-4">Expected Excel Format:</h3>
               
               <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-bold text-purple-800">Photo/Image:</span>{' '}
-                  <span className="text-purple-700">Google Drive link or direct URL</span>{' '}
-                  <span className="text-red-600">*Required</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Latitude:</span>{' '}
-                  <span className="text-purple-700">Decimal format (e.g., 19.0760)</span>{' '}
-                  <span className="text-red-600">*Required</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Longitude:</span>{' '}
-                  <span className="text-purple-700">Decimal format (e.g., 72.8777)</span>{' '}
-                  <span className="text-red-600">*Required</span>
-                </div>
-                <div className="pt-2 border-t border-purple-200">
-                  <p className="font-bold text-purple-800 mb-1">Optional Fields:</p>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Name:</span>{' '}
-                  <span className="text-purple-700">Common or scientific name</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Location:</span>{' '}
-                  <span className="text-purple-700">Place name or description</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Stem:</span>{' '}
+                <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide mb-3">Column order must match exactly — use the template above</p>
+                <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5">
+                  <span className="font-bold text-purple-800">Col 1 — Photo/Image Link</span>
+                  <span className="text-purple-700">Google Drive sharing URL <span className="text-red-600">*Required</span></span>
+
+                  <span className="font-bold text-purple-800">Col 2 — Latitude</span>
+                  <span className="text-purple-700">Decimal format, e.g. 19.0760 <span className="text-red-600">*Required</span></span>
+
+                  <span className="font-bold text-purple-800">Col 3 — Longitude</span>
+                  <span className="text-purple-700">Decimal format, e.g. 72.8777 <span className="text-red-600">*Required</span></span>
+
+                  <span className="font-bold text-purple-800">Col 4 — Common Name</span>
+                  <span className="text-purple-700">e.g. "Button Mushroom"</span>
+
+                  <span className="font-bold text-purple-800">Col 5 — Scientific Name</span>
+                  <span className="text-purple-700">e.g. "Agaricus bisporus"</span>
+
+                  <span className="font-bold text-purple-800">Col 6 — Stem Presence</span>
                   <span className="text-purple-700">"has-stem" or "has-no-stem"</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Bottom/Underside:</span>{' '}
-                  <span className="text-purple-700">"gills", "pores", "teeth", "smooth"</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Texture:</span>{' '}
-                  <span className="text-purple-700">"soft", "hard", "jelly-like", "leathery"</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Role:</span>{' '}
+
+                  <span className="font-bold text-purple-800">Col 7 — Underside</span>
+                  <span className="text-purple-700">"gills", "pores", "teeth"</span>
+
+                  <span className="font-bold text-purple-800">Col 8 — Texture</span>
+                  <span className="text-purple-700">"soft-to-touch", "hard-to-touch", "jelly-like", "leathery"</span>
+
+                  <span className="font-bold text-purple-800">Col 9 — Ecological Role</span>
                   <span className="text-purple-700">"decomposer", "symbiont", "parasite"</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Use:</span>{' '}
+
+                  <span className="font-bold text-purple-800">Col 10 — Common Uses</span>
                   <span className="text-purple-700">"edible", "inedible", "poisonous", "medicinal"</span>
-                </div>
-                <div>
-                  <span className="font-bold text-purple-800">Description:</span>{' '}
-                  <span className="text-purple-700">Notes or additional details</span>
                 </div>
               </div>
 

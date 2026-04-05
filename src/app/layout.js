@@ -5,6 +5,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
 import AuthSessionProvider from "@/components/AuthSessionProvider";
 import AppToaster from "@/components/AppToaster";
+import ScrollToTop from "@/components/ScrollToTop";
 
 export const metadata = {
   title: "Eco Vigyan Foundation",
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
             <main className="flex-1">{children}</main>
             <Footer />
             <AppToaster/>
+            <ScrollToTop />
           </AuthProvider>
         </AuthSessionProvider>
       </body>

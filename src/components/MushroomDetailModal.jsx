@@ -136,7 +136,7 @@ export default function MushroomDetailModal({ isOpen, onClose, mushroom }) {
           Species Profile
         </h2>
         <p className="text-2xl font-bold text-slate-900 leading-tight">
-          {mushroom.name || mushroom.commonName || "Unnamed Mushroom"}
+          {mushroom.commonName || mushroom.scientificName || "Unnamed Mushroom"}
         </p>
       </div>
       <button
@@ -157,7 +157,7 @@ export default function MushroomDetailModal({ isOpen, onClose, mushroom }) {
             <div className="relative w-full h-64 md:h-80 rounded-2xl overflow-hidden shadow-lg border-4 border-white">
               <img
                 src={mushroom.image || mushroom.images?.[0]?.url}
-                alt={mushroom.name}
+                alt={mushroom.commonName || mushroom.scientificName}
                 className="w-full h-full object-cover"
               />
               {/* Subtle Gradient Overlay */}

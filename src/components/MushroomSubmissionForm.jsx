@@ -28,6 +28,8 @@ export default function MushroomSubmissionForm({
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState("idle"); // idle | signing | uploading | saving
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationInputMethod, setLocationInputMethod] = useState("map"); // map, city, manual
   const [hasExifGps, setHasExifGps] = useState(false);
@@ -451,12 +453,19 @@ export default function MushroomSubmissionForm({
   }
 
   setIsSubmitting(true);
+  setUploadProgress(0);
+  setUploadStage("signing");
 
   try {
     // 1️⃣ Upload image to Cloudinary
-    const upload = await uploadToCloudinary(imageFile);
+    setUploadStage("uploading");
+    const upload = await uploadToCloudinary(imageFile, {
+      onProgress: (pct) => setUploadProgress(pct),
+    });
+    setUploadProgress(100);
 
     // 2️⃣ Send coordinates + image URL as JSON
+    setUploadStage("saving");
     const res = await fetch("/api/mushrooms", {
       method: "POST",
       headers: {
@@ -516,6 +525,8 @@ toast.success(data.message || "Mushroom submitted successfully!");
     toast.error(err.message || "Failed to submit mushroom");
   } finally {
     setIsSubmitting(false);
+    setUploadStage("idle");
+    setUploadProgress(0);
   }
 };
 
@@ -523,8 +534,8 @@ toast.success(data.message || "Mushroom submitted successfully!");
   const currentLocation = getCurrentLocation();
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 bg-emerald-950/40 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
-      <div className="bg-white border border-stone-200 w-full max-w-md rounded-2xl sm:rounded-[2.5rem] shadow-2xl relative animate-in zoom-in-95 duration-300 my-4 sm:my-8 max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center sm:p-4 bg-emerald-950/40 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white border border-stone-200 w-full max-w-md rounded-t-3xl sm:rounded-[2.5rem] shadow-2xl relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-300 max-h-[92dvh] sm:max-h-[90dvh] flex flex-col">
         {/* CLOSE BUTTON */}
         <button
           onClick={onClose}
@@ -1138,14 +1149,40 @@ toast.success(data.message || "Mushroom submitted successfully!");
         </form>
 
         {/* SUBMIT BUTTON - Fixed */}
-        <div className="p-4 sm:p-6 md:p-8 md:pt-4 pt-3 border-t border-stone-200 shrink-0">
+        <div className="p-4 sm:p-6 md:p-8 md:pt-4 pt-3 border-t border-stone-200 shrink-0 space-y-3">
+          {/* Progress indicator */}
+          {isSubmitting && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-emerald-700">
+                  {uploadStage === "signing" && "Preparing upload..."}
+                  {uploadStage === "uploading" && "Uploading photo..."}
+                  {uploadStage === "saving" && "Saving observation..."}
+                </span>
+                {uploadStage === "uploading" && (
+                  <span className="text-emerald-600">{uploadProgress}%</span>
+                )}
+              </div>
+              <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                  style={{
+                    width: uploadStage === "signing" ? "5%" :
+                           uploadStage === "uploading" ? `${5 + uploadProgress * 0.85}%` :
+                           "95%"
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             form="mushroom-form"
             disabled={isSubmitting}
             className="w-full bg-emerald-600 hover:bg-emerald-700 py-4 sm:py-5 rounded-2xl text-white font-black text-xs sm:text-sm uppercase tracking-[0.2em] transition-all active:scale-95 shadow-xl shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Processing..." : "Submit Observation"}
+            {isSubmitting ? "Submitting..." : "Submit Observation"}
           </button>
         </div>
       </div>

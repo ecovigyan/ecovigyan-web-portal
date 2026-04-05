@@ -153,7 +153,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link 
-                  href="/my-submissions"
+                  href="/dashboard"
                   className="hover:text-emerald-400 transition-colors inline-flex items-center group"
                 >
                   <span className="group-hover:translate-x-1 transition-transform">Member Portal</span>

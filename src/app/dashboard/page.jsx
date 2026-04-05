@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  MapPin, 
-  CheckCircle, 
-  Clock, 
+import {
+  LayoutDashboard,
+  MapPin,
+  CheckCircle,
+  Clock,
   XCircle,
   FileText,
   ArrowRight,
@@ -24,9 +24,9 @@ import {
   Filter,
   ImageIcon,
   FileEdit,
-  CheckSquare,
-  Square,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ReviewObservationModal } from '@/components/ReviewObservationModal';
@@ -65,16 +65,15 @@ export default function Dashboard() {
     systemImports: 0
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
   useEffect(() => {
-    // Wait for auth to load before making redirect decisions
     if (authLoading) return;
-    
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+    if (!user) { router.push('/login'); return; }
     loadData();
-  }, [user, authLoading, observationFilter]);
+  }, [user, authLoading, observationFilter, currentPage]);
 
   const loadData = async () => {
     if (!user) return;
@@ -84,17 +83,18 @@ export default function Dashboard() {
       
       if (user.role === 'admin') {
         // Admin: Fetch based on filter
-        const url = observationFilter === 'all' 
-          ? '/api/admin/mushrooms'
-          : observationFilter === 'system-imports'
-          ? '/api/admin/mushrooms?systemImports=true&page=1&limit=1000'
-          : `/api/admin/mushrooms?status=${observationFilter}`;
+        const url = observationFilter === 'system-imports'
+          ? `/api/admin/mushrooms?systemImports=true&page=${currentPage}&limit=24`
+          : observationFilter === 'all'
+          ? `/api/admin/mushrooms?page=${currentPage}`
+          : `/api/admin/mushrooms?status=${observationFilter}&page=${currentPage}`;
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (res.ok) {
           setObservations(data.mushrooms || []);
-          // Fetch counts
+          setTotalPages(data.totalPages || 1);
+          setTotalCount(data.total || 0);
           await fetchCounts();
         } else {
           throw new Error(data.error || 'Failed to fetch observations');
@@ -453,6 +453,7 @@ export default function Dashboard() {
                                   onClick={() => {
                                     setActiveTab('observations');
                                     setObservationFilter('pending');
+                                    setCurrentPage(1);
                                     setShowNotifications(false);
                                   }}
                                   className="w-full p-4 hover:bg-gray-50 transition-all text-left"
@@ -599,6 +600,7 @@ export default function Dashboard() {
                         onClick={() => {
                           setActiveTab('observations');
                           setObservationFilter('pending');
+                          setCurrentPage(1);
                         }}
                         className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1"
                       >
@@ -640,7 +642,7 @@ export default function Dashboard() {
                   <div className="grid md:grid-cols-3 gap-4">
                     {user.role !== 'admin' && (
                       <Link
-                        href="/my-submissions"
+                        href="/dashboard"
                         className="group flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50 to-teal-100 rounded-xl hover:shadow-md transition-all border border-emerald-200"
                       >
                         <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
@@ -662,7 +664,7 @@ export default function Dashboard() {
                         <MapPin className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-teal-900 mb-0.5">Mushroom Hub</div>
+                        <div className="font-bold text-teal-900 mb-0.5">Mushroom Mania</div>
                         <div className="text-xs text-teal-700">Add new observations</div>
                       </div>
                       <ArrowRight className="w-5 h-5 text-teal-600 group-hover:translate-x-1 transition-transform" />
@@ -724,7 +726,7 @@ export default function Dashboard() {
                     return (
                       <button
                         key={stat.label}
-                        onClick={() => setObservationFilter(stat.label.toLowerCase())}
+                        onClick={() => { setObservationFilter(stat.label.toLowerCase()); setCurrentPage(1); }}
                         className={`p-4 rounded-xl border-2 transition-all ${
                           isActive 
                             ? 'bg-white border-emerald-500 shadow-lg scale-105' 
@@ -747,7 +749,7 @@ export default function Dashboard() {
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
                   <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-4">
                     <div className="text-sm text-gray-600">
-                      Showing <span className="font-bold text-gray-900">{filteredObservations.length}</span> {observationFilter === 'all' ? 'total' : observationFilter.replace('-', ' ')} submission{filteredObservations.length !== 1 ? 's' : ''}
+                      Showing <span className="font-bold text-gray-900">{observations.length}</span> of <span className="font-bold text-gray-900">{totalCount}</span> {observationFilter === 'all' ? 'total' : observationFilter.replace('-', ' ')} submission{totalCount !== 1 ? 's' : ''}
                     </div>
 
                     <div className="flex gap-2 flex-wrap">
@@ -1001,6 +1003,54 @@ export default function Dashboard() {
                         </div>
                       </motion.div>
                     ))
+                  )}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <p className="text-sm text-gray-500">
+                        Page {currentPage} of {totalPages}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="flex items-center gap-1 px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          <ChevronLeft className="w-4 h-4" /> Prev
+                        </button>
+                        <div className="flex gap-1">
+                          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                            const page = currentPage <= 3
+                              ? i + 1
+                              : currentPage >= totalPages - 2
+                              ? totalPages - 4 + i
+                              : currentPage - 2 + i;
+                            if (page < 1 || page > totalPages) return null;
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                className={`w-9 h-9 text-sm font-semibold rounded-lg transition-all ${
+                                  page === currentPage
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'border border-gray-200 hover:bg-gray-50 text-gray-700'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                          className="flex items-center gap-1 px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          Next <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </motion.div>

@@ -55,6 +55,9 @@ export async function GET(req, { params }) {
 }
 
 // PUT - Update article
+// Accepts JSON: { title, content, image1: {url, publicId} | null, image2: {url, publicId} | null,
+//                 keepImage1: bool, keepImage2: bool }
+// Images are uploaded client-side to Cloudinary before this call.
 export async function PUT(req, { params }) {
   try {
     await connectDB();
@@ -89,15 +92,19 @@ export async function PUT(req, { params }) {
       );
     }
 
-    const formData = await req.formData();
-    const title = formData.get("title")?.trim();
-    const content = formData.get("content")?.trim();
-    const image1 = formData.get("image1");
-    const image2 = formData.get("image2");
-    const removeImage1 = formData.get("removeImage1") === "true";
-    const removeImage2 = formData.get("removeImage2") === "true";
+    const body = await req.json();
+    const {
+      title: rawTitle,
+      content: rawContent,
+      image1,      // { url, publicId } | null
+      image2,      // { url, publicId } | null
+      keepImage1 = true,
+      keepImage2 = true,
+    } = body;
 
-    // Validation
+    const title = rawTitle?.trim();
+    const content = rawContent?.trim();
+
     if (title !== undefined && title !== null) {
       if (!title || title.length < 5 || title.length > 200) {
         return NextResponse.json(
@@ -118,112 +125,38 @@ export async function PUT(req, { params }) {
       article.content = content;
     }
 
-    // Handle image updates
-    const maxFileSize = 10 * 1024 * 1024;
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     let updatedImages = [...article.images];
 
-    // Remove images if requested
-    if (removeImage1 && updatedImages.length > 0) {
-      const imageToRemove = updatedImages[0];
-      try {
-        await cloudinary.uploader.destroy(imageToRemove.public_id);
-      } catch (err) {
-        console.error("Error deleting image from Cloudinary:", err);
+    // Handle slot 0 (image1)
+    if (image1?.url && image1?.publicId) {
+      // New image uploaded — delete old if present
+      if (updatedImages[0]?.public_id) {
+        try { await cloudinary.uploader.destroy(updatedImages[0].public_id); } catch {}
+      }
+      updatedImages[0] = { url: image1.url, public_id: image1.publicId };
+    } else if (!keepImage1) {
+      // Remove image1
+      if (updatedImages[0]?.public_id) {
+        try { await cloudinary.uploader.destroy(updatedImages[0].public_id); } catch {}
       }
       updatedImages = updatedImages.slice(1);
     }
 
-    if (removeImage2 && updatedImages.length > 1) {
-      const imageToRemove = updatedImages[1];
-      try {
-        await cloudinary.uploader.destroy(imageToRemove.public_id);
-      } catch (err) {
-        console.error("Error deleting image from Cloudinary:", err);
+    // Handle slot 1 (image2)
+    if (image2?.url && image2?.publicId) {
+      if (updatedImages.length >= 2) {
+        if (updatedImages[1]?.public_id) {
+          try { await cloudinary.uploader.destroy(updatedImages[1].public_id); } catch {}
+        }
+        updatedImages[1] = { url: image2.url, public_id: image2.publicId };
+      } else {
+        updatedImages.push({ url: image2.url, public_id: image2.publicId });
+      }
+    } else if (!keepImage2) {
+      if (updatedImages[1]?.public_id) {
+        try { await cloudinary.uploader.destroy(updatedImages[1].public_id); } catch {}
       }
       updatedImages = updatedImages.slice(0, 1);
-    }
-
-    // Add new images
-    if (image1 && image1 instanceof File && image1.size > 0) {
-      if (image1.size > maxFileSize) {
-        return NextResponse.json(
-          { error: "Image 1 file size must be less than 10MB" },
-          { status: 400 }
-        );
-      }
-      if (!allowedTypes.includes(image1.type)) {
-        return NextResponse.json(
-          { error: "Image 1 must be in JPEG, PNG, or WebP format" },
-          { status: 400 }
-        );
-      }
-
-      const buffer = Buffer.from(await image1.arrayBuffer());
-      const uploadResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          { folder: "articles", resource_type: "image" },
-          (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          }
-        ).end(buffer);
-      });
-
-      if (updatedImages.length === 0) {
-        updatedImages.push({
-          public_id: uploadResult.public_id,
-          url: uploadResult.secure_url,
-        });
-      } else {
-        try {
-          await cloudinary.uploader.destroy(updatedImages[0].public_id);
-        } catch (err) {
-          console.error("Error deleting old image:", err);
-        }
-        updatedImages[0] = {
-          public_id: uploadResult.public_id,
-          url: uploadResult.secure_url,
-        };
-      }
-    }
-
-    if (image2 && image2 instanceof File && image2.size > 0) {
-      if (updatedImages.length >= 2) {
-        return NextResponse.json(
-          { error: "Maximum 2 images allowed" },
-          { status: 400 }
-        );
-      }
-
-      if (image2.size > maxFileSize) {
-        return NextResponse.json(
-          { error: "Image 2 file size must be less than 10MB" },
-          { status: 400 }
-        );
-      }
-      if (!allowedTypes.includes(image2.type)) {
-        return NextResponse.json(
-          { error: "Image 2 must be in JPEG, PNG, or WebP format" },
-          { status: 400 }
-        );
-      }
-
-      const buffer = Buffer.from(await image2.arrayBuffer());
-      const uploadResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          { folder: "articles", resource_type: "image" },
-          (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          }
-        ).end(buffer);
-      });
-
-      updatedImages.push({
-        public_id: uploadResult.public_id,
-        url: uploadResult.secure_url,
-      });
     }
 
     article.images = updatedImages;
@@ -285,7 +218,6 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    // Delete images from Cloudinary
     for (const image of article.images) {
       try {
         await cloudinary.uploader.destroy(image.public_id);
@@ -296,9 +228,7 @@ export async function DELETE(req, { params }) {
 
     await Article.findByIdAndDelete(id);
 
-    return NextResponse.json({
-      message: "Article deleted successfully",
-    });
+    return NextResponse.json({ message: "Article deleted successfully" });
   } catch (error) {
     console.error("Article delete error:", error);
     return NextResponse.json(

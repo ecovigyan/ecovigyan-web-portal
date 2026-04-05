@@ -15,8 +15,7 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
 
   const navLinks = [
-    
-    { name: 'Mushroom Hub', href: '/explore' },
+    { name: 'Mushroom Mania', href: '/explore', featured: true },
     { name: 'Programs', href: '/programs' },
     { name: 'Get Involved', href: '/join-us' },
   ];
@@ -55,9 +54,19 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className="text-sm font-medium text-emerald-800 hover:text-emerald-600 transition-colors"
+                  className={`relative text-sm font-medium transition-colors ${
+                    link.featured
+                      ? 'text-emerald-700 font-semibold hover:text-emerald-500'
+                      : 'text-emerald-800 hover:text-emerald-600'
+                  }`}
                 >
                   {link.name}
+                  {link.featured && (
+                    <span className="absolute -top-1.5 -right-3 flex items-center justify-center">
+                      <span className="absolute inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                    </span>
+                  )}
                 </Link>
               ))}
               
@@ -169,10 +178,18 @@ export default function Navbar() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className="block px-3 py-3 text-base font-medium text-emerald-900 hover:bg-emerald-50 rounded-lg"
+                    className={`flex items-center justify-between px-3 py-3 text-base font-medium rounded-lg hover:bg-emerald-50 ${
+                      link.featured ? 'text-emerald-700 font-semibold' : 'text-emerald-900'
+                    }`}
                     onClick={() => setIsOpen(false)}
                   >
                     {link.name}
+                    {link.featured && (
+                      <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Featured
+                      </span>
+                    )}
                   </Link>
                 ))}
 

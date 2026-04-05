@@ -76,7 +76,7 @@ export default function UserProfilePage() {
           className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold mb-8 transition-colors"
         >
           <ArrowLeft size={20} />
-          Back to Mushroom Hub
+          Back to Mushroom Mania
         </Link>
 
         {/* PROFILE HEADER - MushroomHub Style */}
@@ -231,7 +231,7 @@ function MushroomCard({ mushroom, formatDate }) {
         
         <div className="absolute bottom-3 left-3 right-3">
           <h3 className="text-white font-bold text-sm line-clamp-2">
-            {mushroom.commonName || "Unknown Species"}
+            {mushroom.commonName || mushroom.scientificName || "Unknown Species"}
           </h3>
         </div>
       </div>

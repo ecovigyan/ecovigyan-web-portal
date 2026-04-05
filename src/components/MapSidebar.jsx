@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Layers, Navigation } from "lucide-react";
+import { X, MapPin } from "lucide-react";
 import SpeciesSearchInput from "./SpeciesSearchInput";
 import LocationSearchInput from "./LocationSearchInput";
 import ActiveFiltersDisplay from "./ActiveFiltersDisplay";
@@ -74,33 +74,6 @@ export default function MapSidebar({
                 onZoneClear={onZoneClear}
               />
               
-              {/* Zones & Trails Actions */}
-              <div className="space-y-3">
-                <label className="block text-xs font-semibold text-emerald-900 mb-2">
-                  Explore Tools
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={onZonesClick}
-                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 hover:border-emerald-300 transition-all group"
-                  >
-                    <div className="p-2 rounded-xl bg-emerald-600 group-hover:bg-emerald-700 text-white transition-colors">
-                      <Layers size={20} strokeWidth={2.5} />
-                    </div>
-                    <span className="text-xs font-bold text-emerald-900">Zones</span>
-                  </button>
-                  
-                  <button
-                    onClick={onTrailsClick}
-                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-300 transition-all group"
-                  >
-                    <div className="p-2 rounded-xl bg-blue-600 group-hover:bg-blue-700 text-white transition-colors">
-                      <Navigation size={20} strokeWidth={2.5} />
-                    </div>
-                    <span className="text-xs font-bold text-blue-900">Trails</span>
-                  </button>
-                </div>
-              </div>
               
               {/* Active Filters Display */}
               {(speciesSearchTerm || selectedZone) && (

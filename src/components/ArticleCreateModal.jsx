@@ -151,13 +151,13 @@ export default function ArticleCreateModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center sm:p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.2 }}
-          className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full my-8"
+          className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92dvh] sm:max-h-[90dvh] overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -186,7 +186,7 @@ export default function ArticleCreateModal({
           </div>
 
           {/* Form */}
-          <div className="p-8 max-h-[70vh] overflow-y-auto">
+          <div className="p-8 flex-1 overflow-y-auto">
             <div className="space-y-6">
               {/* Title */}
               <div>

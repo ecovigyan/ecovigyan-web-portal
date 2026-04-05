@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
+import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 import { motion } from "framer-motion";
 import {
   BookOpen,
@@ -61,33 +62,38 @@ export default function ArticlesPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Handle create/edit submit
+  // Upload a single image file to Cloudinary, returns { url, publicId } or null
+  const uploadImage = async (file) => {
+    if (!file) return null;
+    const result = await uploadToCloudinary(file, { folder: "articles" });
+    return { url: result.secure_url, publicId: result.public_id };
+  };
+
+  // Handle create/edit submit — images uploaded client-side first, then JSON to API
   const handleModalSubmit = async (formData) => {
     setSubmitting(true);
     try {
-      const submitFormData = new FormData();
-      submitFormData.append("title", formData.title.trim());
-      submitFormData.append("content", formData.content.trim());
-
       if (editingArticle) {
-        // EDIT MODE
-        // Handle image1
-        if (formData.image1) {
-          submitFormData.append("image1", formData.image1);
-        } else if (editingArticle.images?.[0]?.url && !formData.image1Preview) {
-          submitFormData.append("removeImage1", "true");
-        }
+        // EDIT MODE — upload any new images in parallel
+        const [newImage1, newImage2] = await Promise.all([
+          formData.image1 ? uploadImage(formData.image1) : null,
+          formData.image2 ? uploadImage(formData.image2) : null,
+        ]);
 
-        // Handle image2
-        if (formData.image2) {
-          submitFormData.append("image2", formData.image2);
-        } else if (editingArticle.images?.[1]?.url && !formData.image2Preview) {
-          submitFormData.append("removeImage2", "true");
-        }
+        const keepImage1 = !!formData.image1Preview || !!newImage1;
+        const keepImage2 = !!formData.image2Preview || !!newImage2;
 
         const res = await fetch(`/api/articles/${editingArticle._id}`, {
           method: "PUT",
-          body: submitFormData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formData.title.trim(),
+            content: formData.content.trim(),
+            image1: newImage1 || null,
+            image2: newImage2 || null,
+            keepImage1,
+            keepImage2,
+          }),
         });
 
         const data = await res.json();
@@ -95,17 +101,22 @@ export default function ArticlesPage() {
 
         toast.success("Article updated successfully!");
       } else {
-        // CREATE MODE
-        if (formData.image1) {
-          submitFormData.append("image1", formData.image1);
-        }
-        if (formData.image2) {
-          submitFormData.append("image2", formData.image2);
-        }
+        // CREATE MODE — upload both images in parallel
+        const [image1, image2] = await Promise.all([
+          formData.image1 ? uploadImage(formData.image1) : null,
+          formData.image2 ? uploadImage(formData.image2) : null,
+        ]);
+
+        const images = [image1, image2].filter(Boolean);
 
         const res = await fetch("/api/articles/upload", {
           method: "POST",
-          body: submitFormData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formData.title.trim(),
+            content: formData.content.trim(),
+            images,
+          }),
         });
 
         const data = await res.json();

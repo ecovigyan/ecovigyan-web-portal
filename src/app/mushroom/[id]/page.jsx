@@ -43,7 +43,7 @@ export default function MushroomDetailPage() {
   const mushroomData = {
     lat: mushroom.location?.latitude || mushroom.latitude,
     lng: mushroom.location?.longitude || mushroom.longitude,
-    name: mushroom.commonName || mushroom.name || "Unknown Species",
+    name: mushroom.commonName || mushroom.scientificName || mushroom.name || "Unknown Species",
     image: mushroom.images?.[0]?.url || mushroom.image,
   };
 
@@ -112,19 +112,21 @@ export default function MushroomDetailPage() {
                 {mushroomData.name}
               </h1>
               <p className="text-2xl italic font-medium text-emerald-800/50 font-serif">
-                {mushroom.scientificName || "Species Incognita"}
+                {mushroom.commonName ? (mushroom.scientificName || "Species Incognita") : "Species Incognita"}
               </p>
             </header>
 
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <Stat card label="Ecological Role" value={mushroom.ecologicalRole} />
+               <Stat card label="Ecological Role" value={mushroom.ecologicalRole?.join(", ")} />
                <Stat card label="Texture" value={mushroom.texture} />
+               {(mushroom.underside || mushroom.stemPresence || mushroom.commonUses?.length > 0) && (
                <div className="sm:col-span-2 bg-white border border-stone-200/60 rounded-[2.5rem] p-8 space-y-4">
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 mb-2">Technical Summary</h3>
                   <Stat label="Underside" value={mushroom.underside} />
                   <Stat label="Stem Presence" value={mushroom.stemPresence} />
                   <Stat label="Common Uses" value={mushroom.commonUses?.join(", ")} />
                </div>
+               )}
             </section>
 
             {/* ENLARGED MAP SECTION */}
@@ -158,7 +160,7 @@ export default function MushroomDetailPage() {
                       ).map(m => ({
                         lat: m.location?.latitude || m.latitude,
                         lng: m.location?.longitude || m.longitude,
-                        name: m.commonName || m.name,
+                        name: m.commonName || m.scientificName,
                         id: m._id || m.id
                       })).filter(l => l.lat && l.lng)
                     }

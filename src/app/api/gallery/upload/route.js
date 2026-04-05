@@ -1,6 +1,5 @@
 import { connectDB } from "@/lib/mongodb";
 import Gallery from "@/models/Gallery";
-import cloudinary from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 
@@ -8,13 +7,11 @@ export async function POST(req) {
   try {
     await connectDB();
 
-    // Authentication check
     const { user, error } = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is writer or admin
     if (user.role !== "writer" && user.role !== "admin") {
       return NextResponse.json(
         { error: "Only writers and admins can upload gallery images" },
@@ -22,54 +19,31 @@ export async function POST(req) {
       );
     }
 
-    // Validate Cloudinary configuration
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-      return NextResponse.json(
-        { error: "Cloudinary is not configured" },
-        { status: 500 }
-      );
-    }
+    const body = await req.json();
+    const {
+      imageUrl,
+      publicId,
+      studentName: rawStudentName,
+      schoolName: rawSchoolName,
+      description: rawDescription = "",
+      title = "",
+      category = "",
+      program = "",
+      year = "",
+      theme = "",
+    } = body;
 
-    const formData = await req.formData();
-    const image = formData.get("image");
-    const studentName = formData.get("studentName")?.trim();
-    const schoolName = formData.get("schoolName")?.trim();
-    const description = formData.get("description")?.trim() || "";
-    
-    // New optional fields
-    const title = formData.get("title")?.trim() || "";
-    const category = formData.get("category")?.trim() || "";
-    const program = formData.get("program")?.trim() || "";
-    const year = formData.get("year")?.trim() || "";
-    const theme = formData.get("theme")?.trim() || "";
+    const studentName = rawStudentName?.trim();
+    const schoolName = rawSchoolName?.trim();
+    const description = rawDescription?.trim();
 
-    // Validation
-    if (!image || !studentName || !schoolName) {
+    if (!imageUrl || !publicId || !studentName || !schoolName) {
       return NextResponse.json(
-        { error: "Image, student name, and school name are required" },
+        { error: "Image URL, student name, and school name are required" },
         { status: 400 }
       );
     }
 
-    // Validate image file
-    const maxFileSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-
-    if (image.size > maxFileSize) {
-      return NextResponse.json(
-        { error: "Image file size must be less than 10MB" },
-        { status: 400 }
-      );
-    }
-
-    if (!allowedTypes.includes(image.type)) {
-      return NextResponse.json(
-        { error: "Image must be in JPEG, PNG, or WebP format" },
-        { status: 400 }
-      );
-    }
-
-    // Validate text fields
     if (studentName.length < 2 || studentName.length > 100) {
       return NextResponse.json(
         { error: "Student name must be between 2 and 100 characters" },
@@ -91,37 +65,10 @@ export async function POST(req) {
       );
     }
 
-    // Upload to Cloudinary
-    const buffer = Buffer.from(await image.arrayBuffer());
-
-    const uploadResult = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "gallery",
-          resource_type: "image",
-        },
-        (err, result) => {
-          if (err) {
-            console.error("Cloudinary upload error:", err);
-            reject(new Error(`Image upload failed: ${err.message || "Unknown error"}`));
-            return;
-          }
-          if (!result) {
-            reject(new Error("Image upload failed: No result returned"));
-            return;
-          }
-          resolve(result);
-        }
-      );
-
-      uploadStream.end(buffer);
-    });
-
-    // Create gallery entry
     const galleryItem = await Gallery.create({
       image: {
-        public_id: uploadResult.public_id,
-        url: uploadResult.secure_url,
+        public_id: publicId,
+        url: imageUrl,
       },
       studentName,
       schoolName,
@@ -135,7 +82,6 @@ export async function POST(req) {
       status: "active",
     });
 
-    // Populate uploadedBy for response
     await galleryItem.populate("uploadedBy", "name username");
 
     return NextResponse.json(

@@ -1,6 +1,5 @@
 import { connectDB } from "@/lib/mongodb";
 import Article from "@/models/Article";
-import cloudinary from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
 
@@ -8,7 +7,6 @@ export async function POST(req) {
   try {
     await connectDB();
 
-    /* ================= AUTH ================= */
     const { user, error } = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
@@ -21,12 +19,11 @@ export async function POST(req) {
       );
     }
 
-    /* ================= FORM DATA ================= */
-    const formData = await req.formData();
-    const title = formData.get("title")?.trim();
-    const content = formData.get("content")?.trim();
-    const image1 = formData.get("image1");
-    const image2 = formData.get("image2");
+    const body = await req.json();
+    const { title: rawTitle, content: rawContent, images = [] } = body;
+
+    const title = rawTitle?.trim();
+    const content = rawContent?.trim();
 
     if (!title || !content) {
       return NextResponse.json(
@@ -49,54 +46,18 @@ export async function POST(req) {
       );
     }
 
-    /* ================= IMAGES ================= */
-    const images = [];
-    const maxFileSize = 10 * 1024 * 1024;
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-    for (const img of [image1, image2]) {
-      if (!img || !(img instanceof File) || img.size === 0) continue;
-
-      if (img.size > maxFileSize) {
-        return NextResponse.json(
-          { error: "Each image must be under 10MB" },
-          { status: 400 }
-        );
-      }
-
-      if (!allowedTypes.includes(img.type)) {
-        return NextResponse.json(
-          { error: "Invalid image format" },
-          { status: 400 }
-        );
-      }
-
-      images.push(img);
+    if (images.length > 2) {
+      return NextResponse.json(
+        { error: "Maximum 2 images allowed" },
+        { status: 400 }
+      );
     }
 
-    /* ================= CLOUDINARY ================= */
-    const uploadedImages = [];
+    // Validate image objects
+    const uploadedImages = images
+      .filter((img) => img?.url && img?.publicId)
+      .map((img) => ({ url: img.url, public_id: img.publicId }));
 
-    for (const image of images) {
-      const buffer = Buffer.from(await image.arrayBuffer());
-
-      const uploadResult = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          { folder: "articles" },
-          (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          }
-        ).end(buffer);
-      });
-
-      uploadedImages.push({
-        public_id: uploadResult.public_id,
-        url: uploadResult.secure_url,
-      });
-    }
-
-    /* ================= DB ================= */
     const article = await Article.create({
       title,
       content,

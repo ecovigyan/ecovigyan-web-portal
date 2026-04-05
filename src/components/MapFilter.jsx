@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo } from "react";
-import { Filter, ChevronDown, RotateCcw } from "lucide-react";
+import { SlidersHorizontal, RotateCcw, Check } from "lucide-react";
 import {
   ECOLOGICAL_ROLES,
   TEXTURES,
@@ -25,40 +25,26 @@ export default function MapFilter({
   const filterDropdownRef = useRef(null);
   const filterButtonClickedRef = useRef(false);
 
-  // Sync pending filters with actual filters when menu opens
   useEffect(() => {
     if (filterMenuOpen) {
       setPendingFilters(selectedFilters);
     }
   }, [filterMenuOpen, selectedFilters]);
 
-  /* ------------------------------
-     CLICK OUTSIDE HANDLER
-  ------------------------------ */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterButtonClickedRef.current) {
         filterButtonClickedRef.current = false;
         return;
       }
-
-      if (
-        filterMenuOpen &&
-        filterDropdownRef.current &&
-        !filterDropdownRef.current.contains(event.target)
-      ) {
+      if (filterMenuOpen && filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setFilterMenuOpen(false);
       }
     };
-
     document.addEventListener("click", handleClickOutside, true);
-    return () =>
-      document.removeEventListener("click", handleClickOutside, true);
+    return () => document.removeEventListener("click", handleClickOutside, true);
   }, [filterMenuOpen]);
 
-  /* ------------------------------
-     FILTER DATA
-  ------------------------------ */
   const allFilterOptions = [
     ...ECOLOGICAL_ROLES,
     ...TEXTURES,
@@ -69,28 +55,25 @@ export default function MapFilter({
   ];
 
   const filterCategories = [
-    { id: "all", label: "All Filters", options: allFilterOptions },
-    { id: "ecological", label: "Ecological Roles", options: ECOLOGICAL_ROLES },
-    { id: "texture", label: "Textures", options: TEXTURES },
-    { id: "underside", label: "Undersides", options: UNDERSIDES },
-    { id: "surface", label: "Fruiting Surfaces", options: FRUITING_SURFACES },
-    { id: "stem", label: "Stem Presence", options: STEM_PRESENCE },
-    { id: "use", label: "Common Uses", options: COMMON_USES },
+    { id: "all", label: "All" },
+    { id: "ecological", label: "Ecological", options: ECOLOGICAL_ROLES },
+    { id: "texture", label: "Texture", options: TEXTURES },
+    { id: "underside", label: "Underside", options: UNDERSIDES },
+    { id: "surface", label: "Surface", options: FRUITING_SURFACES },
+    { id: "stem", label: "Stem", options: STEM_PRESENCE },
+    { id: "use", label: "Uses", options: COMMON_USES },
   ];
 
   const currentOptions =
-    filterCategories.find((c) => c.id === selectedCategory)?.options ||
-    allFilterOptions;
+    selectedCategory === "all"
+      ? allFilterOptions
+      : filterCategories.find((c) => c.id === selectedCategory)?.options || allFilterOptions;
 
-  /* ------------------------------
-     ACTIVE FILTER COUNT (based on pending filters while menu is open)
-  ------------------------------ */
   const activeFilterCount = Object.values(filterMenuOpen ? pendingFilters : selectedFilters).reduce(
     (total, arr) => total + (Array.isArray(arr) ? arr.length : 0),
     0
   );
 
-  /* Auto-close menu when everything is cleared */
   useEffect(() => {
     if (activeFilterCount === 0) {
       setSelectedCategory("all");
@@ -98,9 +81,6 @@ export default function MapFilter({
     }
   }, [activeFilterCount]);
 
-  /* ------------------------------
-     HELPERS
-  ------------------------------ */
   const getFilterType = (value) => {
     if (ECOLOGICAL_ROLES.includes(value)) return "ecologicalRole";
     if (TEXTURES.includes(value)) return "texture";
@@ -120,8 +100,6 @@ export default function MapFilter({
     e.stopPropagation();
     const type = getFilterType(value);
     if (!type) return;
-
-    // Update pending filters (staging area)
     setPendingFilters((prev) => {
       const currentValues = prev[type] || [];
       const isSelected = currentValues.includes(value);
@@ -132,21 +110,36 @@ export default function MapFilter({
     });
   };
 
-  /* ------------------------------
-     MEMOIZED PROCESSED OPTIONS
-  ------------------------------ */
   const processedOptions = useMemo(() => {
-    return currentOptions.map((option) => {
-      const img = getMushroomImage(option);
-      const label = getDisplayName(option);
-      const selected = isFilterSelected(option);
-      return { option, img, label, selected };
-    });
+    return currentOptions.map((option) => ({
+      option,
+      img: getMushroomImage(option),
+      label: getDisplayName(option),
+      selected: isFilterSelected(option),
+    }));
   }, [currentOptions, pendingFilters]);
 
-  /* ------------------------------
-     RENDER
-  ------------------------------ */
+  const handleApply = (e) => {
+    e.stopPropagation();
+    Object.keys(pendingFilters).forEach((filterType) => {
+      const pendingValues = pendingFilters[filterType] || [];
+      const currentValues = selectedFilters[filterType] || [];
+      currentValues.filter((v) => !pendingValues.includes(v)).forEach((v) => onFilterToggle(filterType, v));
+      pendingValues.filter((v) => !currentValues.includes(v)).forEach((v) => onFilterToggle(filterType, v));
+    });
+    if (onApplyFilter) onApplyFilter(pendingFilters);
+    setFilterMenuOpen(false);
+  };
+
+  const handleReset = (e) => {
+    e.stopPropagation();
+    const empty = { ecologicalRole: [], texture: [], underside: [], fruitingSurface: [], stemPresence: [], commonUses: [] };
+    setPendingFilters(empty);
+    onResetFilters();
+    setSelectedCategory("all");
+    setFilterMenuOpen(false);
+  };
+
   return (
     <div className="relative">
       {/* FILTER BUTTON */}
@@ -157,18 +150,16 @@ export default function MapFilter({
           filterButtonClickedRef.current = true;
           setFilterMenuOpen((prev) => !prev);
         }}
-        className="relative flex items-center gap-1.5 px-3 py-2 bg-emerald-600/90 hover:bg-emerald-700 rounded-xl text-white"
+        className={`relative flex items-center gap-2 px-4 py-2.5 rounded-2xl backdrop-blur-md border shadow-lg font-bold text-sm transition-all duration-200 ${
+          activeFilterCount > 0
+            ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-500/30"
+            : "bg-white/90 border-emerald-100 text-emerald-700 hover:bg-white"
+        }`}
       >
-        <Filter size={20} className="md:w-4 md:h-4" />
-        <ChevronDown
-          size={14}
-          className={`md:w-3 md:h-3 transition-transform ${
-            filterMenuOpen ? "rotate-180" : ""
-          }`}
-        />
-
+        <SlidersHorizontal size={15} />
+        <span>Filters</span>
         {activeFilterCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-emerald-600 text-[10px] font-black rounded-full flex items-center justify-center">
+          <span className="flex items-center justify-center w-5 h-5 bg-white text-emerald-600 text-[10px] font-black rounded-full">
             {activeFilterCount}
           </span>
         )}
@@ -178,110 +169,78 @@ export default function MapFilter({
       {filterMenuOpen && (
         <div
           ref={filterDropdownRef}
-          className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border z-50"
           onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-emerald-100 z-50 overflow-hidden"
         >
           {/* HEADER */}
-          <div className="p-2 border-b text-xs font-bold text-gray-800">
-            Filter Options
+          <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-50">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal size={14} className="text-emerald-600" />
+              <span className="font-bold text-slate-800 text-sm">Filter Map</span>
+            </div>
+            {activeFilterCount > 0 && (
+              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                {activeFilterCount} active
+              </span>
+            )}
           </div>
 
-          {/* CATEGORY + RESET */}
-          <div className="p-2 space-y-1 border-b">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-2 py-1 border rounded text-xs text-gray-700"
-            >
-              {filterCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Buttons Container - Flex Column on Mobile */}
-            <div className="flex flex-col gap-1">
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setPendingFilters({
-                  ecologicalRole: [],
-                  texture: [],
-                  underside: [],
-                  fruitingSurface: [],
-                  stemPresence: [],
-                  commonUses: [],
-                });
-                onResetFilters();
-                setSelectedCategory("all");
-                setFilterMenuOpen(false);
-              }}
-              className="w-full flex items-center justify-center gap-1 px-2 py-2 md:py-1 text-xs md:text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            >
-              <RotateCcw size={14} className="md:w-3 md:h-3" />
-              Reset All Filters
-            </button>
-
-            {/* Apply Filter Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Apply pending filters to actual filters
-                Object.keys(pendingFilters).forEach((filterType) => {
-                  const pendingValues = pendingFilters[filterType] || [];
-                  const currentValues = selectedFilters[filterType] || [];
-                  
-                  // Find values to remove (in current but not in pending)
-                  const toRemove = currentValues.filter(v => !pendingValues.includes(v));
-                  // Find values to add (in pending but not in current)
-                  const toAdd = pendingValues.filter(v => !currentValues.includes(v));
-                  
-                  // Remove values
-                  toRemove.forEach(value => onFilterToggle(filterType, value));
-                  // Add values
-                  toAdd.forEach(value => onFilterToggle(filterType, value));
-                });
-                
-                if (onApplyFilter) {
-                  // Pass pending filters so toast knows what's being applied
-                  onApplyFilter(pendingFilters);
-                }
-                setFilterMenuOpen(false);
-              }}
-              className="w-full flex items-center justify-center gap-1 px-2 py-2 md:py-1 text-xs md:text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors font-bold"
-            >
-              <Filter size={14} className="md:w-3 md:h-3" />
-              Apply Filter
-            </button>
-            </div>
+          {/* CATEGORY PILLS */}
+          <div className="px-3 py-2.5 border-b border-emerald-50 flex gap-1.5 overflow-x-auto scrollbar-hide">
+            {filterCategories.map((c) => (
+              <button
+                key={c.id}
+                onClick={(e) => { e.stopPropagation(); setSelectedCategory(c.id); }}
+                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  selectedCategory === c.id
+                    ? "bg-emerald-600 text-white"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
 
           {/* FILTER GRID */}
-          <div className="p-2 max-h-72 overflow-y-auto grid grid-cols-5 gap-2">
+          <div className="p-3 max-h-64 overflow-y-auto grid grid-cols-5 gap-2">
             {processedOptions.map(({ option, img, label, selected }) => (
               <button
                 key={option}
                 onClick={(e) => handleFilterClick(option, e)}
-                className={`flex flex-col items-center gap-1 p-1 rounded border ${
+                className={`relative flex flex-col items-center gap-1 p-1.5 rounded-xl border-2 transition-all ${
                   selected
-                    ? "bg-emerald-50 border-emerald-500"
-                    : "border-gray-200"
+                    ? "bg-emerald-50 border-emerald-400 shadow-sm"
+                    : "border-transparent bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200"
                 }`}
               >
-                {img && (
-                  <img
-                    src={img}
-                    alt={label}
-                    className="w-8 h-8 object-contain"
-                  />
+                {selected && (
+                  <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center">
+                    <Check size={8} strokeWidth={3} className="text-white" />
+                  </span>
                 )}
-                <span className="text-[9px] font-bold text-center text-gray-700">
-                  {label}
-                </span>
+                {img && <img src={img} alt={label} className="w-8 h-8 object-contain" />}
+                <span className="text-[8px] font-bold text-center text-slate-600 leading-tight">{label}</span>
               </button>
             ))}
+          </div>
+
+          {/* ACTION BUTTONS */}
+          <div className="flex gap-2 p-3 border-t border-emerald-50">
+            <button
+              onClick={handleReset}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+            <button
+              onClick={handleApply}
+              className="flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <Check size={12} />
+              Apply Filters
+            </button>
           </div>
         </div>
       )}

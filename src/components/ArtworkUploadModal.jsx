@@ -98,13 +98,13 @@ export default function ArtworkUploadModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
-        <div className="min-h-full w-full flex items-center justify-center py-8">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+        <div className="w-full flex items-end sm:items-center justify-center">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-3xl w-full max-h-[92dvh] sm:max-h-[90dvh] overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 rounded-t-3xl flex-shrink-0">

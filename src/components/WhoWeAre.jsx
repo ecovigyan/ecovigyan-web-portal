@@ -2,21 +2,22 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Play, X, Award, User } from 'lucide-react';
+import { Heart, Play, X, Award } from 'lucide-react';
 
 export default function WhoWeAre() {
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [selectedFounder, setSelectedFounder] = useState(null);
 
   const founders = [
     {
       name: 'Shrey Gupta',
       role: 'Co-Founder & Sustainability Educator',
-      image: '/images/testimonials/shilpi.jpeg' // Placeholder
+      image: '/images/founders/shrey.jpeg'
     },
     {
       name: 'Ashish Palyal',
       role: 'Co-Founder & Sustainability Educator',
-      image: '/images/testimonials/raman.jpeg' // Placeholder
+      image: '/images/founders/ashish.jpeg'
     }
   ];
 
@@ -73,10 +74,15 @@ export default function WhoWeAre() {
                     viewport={{ once: true }}
                     transition={{ delay: 0.3 + index * 0.1 }}
                     whileHover={{ scale: 1.05, y: -4 }}
+                    onClick={() => setSelectedFounder(founder)}
                     className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-emerald-100 hover:border-emerald-300 transition-all group cursor-pointer hover:shadow-lg"
                   >
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-200 group-hover:border-emerald-400 transition-colors bg-emerald-100 flex items-center justify-center">
-                      <User className="w-6 h-6 text-emerald-600" />
+                    <div className="w-12 h-12 group-hover:w-16 group-hover:h-16 rounded-full overflow-hidden border-2 border-emerald-200 group-hover:border-emerald-400 transition-all duration-300 bg-emerald-100 flex items-center justify-center shrink-0">
+                      <img
+                        src={founder.image}
+                        alt={founder.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
                     </div>
                     <div>
                       <div className="font-bold text-emerald-900 text-sm group-hover:text-emerald-700 transition-colors">{founder.name}</div>
@@ -179,6 +185,44 @@ export default function WhoWeAre() {
           </motion.div>
         </div>
       </div>
+
+      {/* Founder Image Modal */}
+      <AnimatePresence>
+        {selectedFounder && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedFounder(null)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full"
+            >
+              <button
+                onClick={() => setSelectedFounder(null)}
+                className="absolute top-4 right-4 z-10 w-9 h-9 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={selectedFounder.image}
+                alt={selectedFounder.name}
+                className="w-full object-cover"
+              />
+              <div className="p-5">
+                <div className="font-bold text-emerald-900 text-lg">{selectedFounder.name}</div>
+                <div className="text-emerald-600 text-sm mt-1">{selectedFounder.role}</div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Video Modal */}
       <AnimatePresence>

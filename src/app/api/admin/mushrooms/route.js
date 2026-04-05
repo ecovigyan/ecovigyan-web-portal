@@ -103,9 +103,9 @@ export async function GET(req) {
       }, { status: 200 });
     }
 
-    const status = searchParams.get("status") || "pending";
+    const status = searchParams.get("status") || "all";
 
-    if (!["pending", "approved", "rejected"].includes(status)) {
+    if (!["all", "pending", "approved", "rejected"].includes(status)) {
       return NextResponse.json(
         { error: "Invalid status filter" },
         { status: 400 }
@@ -121,8 +121,8 @@ export async function GET(req) {
       ],
     });
 
-    // Exclude system imports from regular status filters
-    const query = { status };
+    // Build query — "all" returns every status, specific filters scope by status
+    const query = status === "all" ? {} : { status };
     if (systemUser) {
       query.submittedBy = { $ne: systemUser._id };
     }

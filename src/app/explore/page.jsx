@@ -3,13 +3,12 @@
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Menu, X, Home, Info, Users, FileText, Image, Calendar, FileCheck, Mail, User, Settings, Navigation, Heart, Layers, MapPin, CheckCircle, Save, Trash2, Sparkles, ShieldCheck, Zap, Map as MapIcon, Grid, Trophy } from "lucide-react";
+import { Plus, Menu, X, Home, Info, Users, FileText, Image, Calendar, FileCheck, Mail, User, Settings, Navigation, Heart, Layers, MapPin, CheckCircle, Save, Trash2, Sparkles, ShieldCheck, Zap, Map as MapIcon, Grid, Trophy, Search } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import ExploreHeader from "@/components/ExploreHeader";
 import MushroomGrid from "@/components/MushroomGrid";
 import MushroomSubmissionForm from "@/components/MushroomSubmissionForm";
-import MobileSearchModal from "@/components/MobileSearchModal";
 import Leaderboard from "@/components/Leaderboard";
 import ZoneModal from "@/components/ZoneModal";
 import TrailModal from "@/components/TrailModal";
@@ -67,7 +66,6 @@ function MapPageContent() {
 
   // State for search and UI elements
   const [view, setViewState] = useState("map");
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   // Handle opening mushroom detail with URL update
   const handleOpenMushroomDetail = (mushroom) => {
@@ -243,7 +241,7 @@ function MapPageContent() {
           ...m,
           latitude: m.location?.latitude || m.latitude,
           longitude: m.location?.longitude || m.longitude,
-          name: m.commonName || m.name || "Unnamed Mushroom",
+          name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
           image: m.images?.[0]?.url || m.image,
           contributor:
             m.submittedBy?.name ||
@@ -352,8 +350,8 @@ function MapPageContent() {
         const itemRoles = Array.isArray(item.ecologicalRole) 
           ? item.ecologicalRole 
           : [item.ecologicalRole].filter(Boolean);
-        // Check if mushroom has ALL selected roles (AND logic)
-        return headerFilters.ecologicalRole.every((role) => itemRoles.includes(role));
+        // OR logic: mushroom has ANY of the selected roles
+        return headerFilters.ecologicalRole.some((role) => itemRoles.includes(role));
       });
     }
     if (headerFilters.texture.length > 0) {
@@ -379,8 +377,8 @@ function MapPageContent() {
     if (headerFilters.commonUses.length > 0) {
       filtered = filtered.filter((item) => {
         const itemUses = item.commonUses || [];
-        // Check if mushroom has ALL selected uses (AND logic)
-        return headerFilters.commonUses.every((use) => itemUses.includes(use));
+        // OR logic: mushroom has ANY of the selected uses
+        return headerFilters.commonUses.some((use) => itemUses.includes(use));
       });
     }
 
@@ -540,34 +538,6 @@ function MapPageContent() {
     setSelectedZone(null);
   };
 
-  // Handle manual location search - triggered by location search button
-  const handleManualLocationSearch = () => {
-    if (!selectedZone || !selectedZone.boundary) {
-      toast.error("Please select a location first", { duration: 2500 });
-      return;
-    }
-
-    // Count observations in this zone
-    const observationsInZone = allData.filter((item) => {
-      if (!item.latitude || !item.longitude) return false;
-      return isPointInPolygon(item.latitude, item.longitude, selectedZone.boundary);
-    });
-    
-    const count = observationsInZone.length;
-    const locationName = selectedZone.name || "this location";
-    
-    if (count > 0) {
-      toast.success(
-        `Found ${count === 1 ? '1 observation' : `${count} observations`} in ${locationName}`,
-        { duration: 3500, icon: '📍' }
-      );
-    } else {
-      toast.error(
-        `No observations found in ${locationName}`,
-        { duration: 3500 }
-      );
-    }
-  };
 
   // Handle trail location selection
   const handleTrailLocationSelect = (location) => {
@@ -1086,7 +1056,9 @@ function MapPageContent() {
 
   // Handle drawing cancellation
   const handleDrawingCancel = () => {
-    window.location.reload();
+    setDrawingMode(null);
+    getCurrentBoundaryRef.current = null;
+    setMapKey(prev => prev + 1);
   };
 
   // Handle clearing the current drawing (reset but keep drawing mode active)
@@ -1113,12 +1085,8 @@ function MapPageContent() {
   const handleClearZone = () => {
     setSelectedZone(null);
     setDrawingMode(null);
-    // Reset the boundary ref so the shape disappears
-    if (getCurrentBoundaryRef.current) {
-      getCurrentBoundaryRef.current = null;
-    }
-    // Reload the page to ensure all state is reset
-    window.location.reload();
+    getCurrentBoundaryRef.current = null;
+    setMapKey(prev => prev + 1);
   };
 
   const handleSubmissionSuccess = async () => {
@@ -1130,7 +1098,7 @@ function MapPageContent() {
       ...m,
       latitude: m.location?.latitude || m.latitude,
       longitude: m.location?.longitude || m.longitude,
-      name: m.commonName || m.name || "Unnamed Mushroom",
+      name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
       image: m.images?.[0]?.url || m.image,
       contributor:
         m.submittedBy?.name ||
@@ -1202,8 +1170,8 @@ function MapPageContent() {
     if (filtersToCheck.ecologicalRole?.length > 0) {
       filtered = filtered.filter((item) => {
         const roles = Array.isArray(item.ecologicalRole) ? item.ecologicalRole : [item.ecologicalRole];
-        // Must have ALL selected roles
-        return filtersToCheck.ecologicalRole.every((selectedRole) => roles.includes(selectedRole));
+        // OR logic: mushroom has ANY of the selected roles
+        return filtersToCheck.ecologicalRole.some((selectedRole) => roles.includes(selectedRole));
       });
     }
     if (filtersToCheck.texture?.length > 0) {
@@ -1298,40 +1266,53 @@ function MapPageContent() {
                 <ShieldCheck size={14} /> Verified Mycology Hub
               </div>
               <h1 className="text-4xl md:text-6xl font-bold font-serif text-emerald-950 mb-4 tracking-tight">
-                Mushroom Hub
+                Mushroom Mania
               </h1>
               <p className="text-emerald-800/60 max-w-xl text-lg">
                 Map and discover the fungal kingdom of India through citizen science.
               </p>
             </div>
             
-            {/* RIGHT COLUMN: Species of the Day Card */}
+            {/* RIGHT COLUMN: Latest Discovery Card */}
             <div className="bg-emerald-900 rounded-[32px] p-6 text-white relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 opacity-20 -mr-10 -mt-10 group-hover:scale-110 transition-transform">
                 <Zap size={100} fill="white" />
               </div>
               <div className="relative z-10">
                 <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">
-                  Species of the Day
+                  Latest Discovery
                 </div>
-                <h3 className="text-2xl font-bold mb-4 font-serif italic">
-                  {data[0]?.name || "Amanita Muscaria"}
-                </h3>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden shadow-lg">
-                    <img 
-                      src={data[0]?.image || "https://images.unsplash.com/photo-1649279595591-cfc7a11203fd"} 
-                      className="w-full h-full object-cover" 
-                      alt="Species of the day"
-                    />
+                {allData.length === 0 ? (
+                  /* Loading skeleton */
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-7 bg-emerald-700/60 rounded-xl w-3/4" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-700/60" />
+                      <div className="h-8 w-24 bg-emerald-700/60 rounded-xl" />
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => data[0] && handleOpenMushroomDetail(data[0])}
-                    className="bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-bold transition-all"
-                  >
-                    View Profile
-                  </button>
-                </div>
+                ) : (
+                  <>
+                    <h3 className="text-2xl font-bold mb-4 font-serif italic">
+                      {allData[0]?.name || "Unknown Species"}
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden shadow-lg">
+                        <img
+                          src={allData[0]?.image || "https://images.unsplash.com/photo-1649279595591-cfc7a11203fd"}
+                          className="w-full h-full object-cover"
+                          alt="Latest discovery"
+                        />
+                      </div>
+                      <button
+                        onClick={() => handleOpenMushroomDetail(allData[0])}
+                        className="bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                      >
+                        View Profile
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             
@@ -1353,14 +1334,14 @@ function MapPageContent() {
                 <button
                   key={tab.id}
                   onClick={() => setView(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-2.5 sm:px-6 sm:py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
                     view === tab.id
                       ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
                       : "text-emerald-800/40 hover:text-emerald-800/60"
                   }`}
                 >
                   <tab.icon size={18} strokeWidth={2.5} />
-                  <span>{tab.label}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -1385,8 +1366,8 @@ function MapPageContent() {
       {/* MAIN CONTENT */}
       <main className="flex-1 relative overflow-hidden bg-gray-50">
         {view === "map" ? (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div key={`map-container-${mapKey}`} className="w-full flex rounded-3xl overflow-hidden shadow-2xl border border-emerald-100 bg-white" style={{ height: "calc(100vh - 400px)", minHeight: "600px" }}>
+          <div className="w-full">
+            <div key={`map-container-${mapKey}`} className="w-full flex overflow-hidden shadow-2xl border-y border-emerald-100 bg-white" style={{ height: "calc(100vh - 128px)", minHeight: "500px" }}>
               {/* Map Sidebar */}
               <MapSidebar
                 isOpen={sidebarOpen}
@@ -1432,8 +1413,18 @@ function MapPageContent() {
 
                 {/* Map Controls - Top Left */}
                 <div className="absolute top-6 left-6 z-20 flex flex-col gap-3 pointer-events-none">
-                  {/* Filter Button */}
-                  <div className="pointer-events-auto">
+                  {/* Tool Row: Discovery Hub (mobile) + Filter + Zones + Trails */}
+                  <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
+                    {/* Mobile Discovery Hub Toggle */}
+                    <button
+                      onClick={() => setSidebarOpen(true)}
+                      className="md:hidden flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 font-bold text-sm hover:bg-white transition-all"
+                    >
+                      <Search size={15} />
+                      <span className="hidden xs:inline">Search</span>
+                    </button>
+
+                    {/* Filter Button */}
                     <MapFilter
                       onFilterToggle={handleHeaderFilterToggle}
                       onResetFilters={handleResetFilters}
@@ -1441,7 +1432,29 @@ function MapPageContent() {
                       onApplyFilter={handleApplyFilter}
                     />
 
-                    
+                    {/* Zones Button */}
+                    <button
+                      onClick={handleZonesClick}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 font-bold text-sm hover:bg-white transition-all"
+                      title="Zones"
+                    >
+                      <Layers size={15} />
+                      <span>Zones</span>
+                    </button>
+
+                    {/* Trails Button */}
+                    <button
+                      onClick={handleTrailsClick}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl backdrop-blur-md border shadow-lg font-bold text-sm transition-all ${
+                        trailMode
+                          ? "bg-blue-600 border-blue-500 text-white"
+                          : "bg-white/90 border-emerald-100 text-emerald-700 hover:bg-white"
+                      }`}
+                      title="Trails"
+                    >
+                      <Navigation size={15} />
+                      <span>Trails</span>
+                    </button>
                   </div>
                   
                   {/* Drawing Controls (shown when in drawing mode) */}
@@ -1557,7 +1570,7 @@ function MapPageContent() {
                         } else {
                           return (
                             <p className="text-white/70 text-[9px] mb-2">
-                              Calculating distance...
+                              Move closer to a mushroom to see distance
                             </p>
                           );
                         }
@@ -1575,7 +1588,7 @@ function MapPageContent() {
                           <div className="space-y-1 max-h-48 overflow-y-auto">
                             {trailMushrooms.map((mushroom, index) => {
                               const mushroomId = mushroom._id || mushroom.id;
-                              const mushroomName = mushroom.commonName || mushroom.name || `Mushroom ${index + 1}`;
+                              const mushroomName = mushroom.commonName || mushroom.scientificName || mushroom.name || `Mushroom ${index + 1}`;
                               return (
                                 <div 
                                   key={mushroomId || index} 
@@ -1645,15 +1658,6 @@ function MapPageContent() {
       </main>
 
       {/* MODALS */}
-      <MobileSearchModal
-        isOpen={showMobileSearch}
-        onClose={() => setShowMobileSearch(false)}
-        onSpeciesSearch={setSpeciesSearchTerm}
-        onLocationSearch={handleZoneSelect}
-        allData={allData}
-        onManualSearch={handleManualSearch}
-        onManualLocationSearch={handleManualLocationSearch}
-      />
 
       <MushroomSubmissionForm
         isOpen={showAddModal}
@@ -1698,71 +1702,26 @@ function MapPageContent() {
         isSaving={isSavingZone}
       />
 
-      {/* MOBILE FLOATING BUTTONS */}
-      {view === "map" && (
+      {/* MOBILE FLOATING BUTTONS — trail active-state controls only */}
+      {view === "map" && trailMode && (
         <div className="md:hidden fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-          {/* Add Observation Button - Moved to top and made bigger */}
-          {user && (
-            <button
-              onClick={handleOpenAddModal}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-4 rounded-2xl flex items-center gap-2 shadow-2xl shadow-emerald-900/50 transition-all active:scale-95"
-              aria-label="Add Observation"
-            >
-              <Plus size={24} strokeWidth={3} />
-              <span className="font-bold text-base whitespace-nowrap">Add</span>
-            </button>
-          )}
-          
-          {/* Trails Button */}
-          <button
-            onClick={handleTrailsClick}
-            className={`px-4 py-3 rounded-2xl flex items-center gap-2 shadow-2xl transition-all active:scale-95 backdrop-blur-md border ${
-              trailMode
-                ? "bg-blue-700 hover:bg-blue-800 border-blue-600 text-white"
-                : "bg-blue-600/90 hover:bg-blue-700/90 border-blue-500 text-white"
-            }`}
-            aria-label="Trails"
-            title="Trails"
-          >
-            <Navigation size={20} strokeWidth={3} />
-            <span className="font-bold text-sm whitespace-nowrap">Trails</span>
-          </button>
-          
-          {/* Save Trail Button (shown when in trail mode with mushrooms - admin only) */}
-          {trailMode && trailMushrooms.length > 0 && user?.role === "admin" && (
+          {trailMushrooms.length > 0 && user?.role === "admin" && (
             <button
               onClick={handleSaveTrail}
               className="px-4 py-3 rounded-2xl bg-green-600/90 hover:bg-green-700/90 text-white shadow-2xl transition-all active:scale-95 backdrop-blur-md border border-green-500 flex items-center gap-2"
               aria-label="Save Trail"
-              title="Save Trail"
             >
               <Save size={20} strokeWidth={3} />
-              <span className="font-bold text-sm whitespace-nowrap">Save</span>
+              <span className="font-bold text-sm whitespace-nowrap">Save Trail</span>
             </button>
           )}
-          
-          {/* End Trail Button (shown when in trail mode) */}
-          {trailMode && (
-            <button
-              onClick={handleEndTrail}
-              className="px-4 py-3 rounded-2xl bg-red-600/90 hover:bg-red-700/90 text-white shadow-2xl transition-all active:scale-95 backdrop-blur-md border border-red-500 flex items-center gap-2"
-              aria-label="End Trail"
-              title="End Trail"
-            >
-              <X size={20} strokeWidth={3} />
-              <span className="font-bold text-sm whitespace-nowrap">End</span>
-            </button>
-          )}
-          
-          {/* Zones Button */}
           <button
-            onClick={handleZonesClick}
-            className="bg-emerald-600/90 hover:bg-emerald-700/90 text-white px-4 py-3 rounded-2xl flex items-center gap-2 shadow-2xl shadow-emerald-900/50 transition-all active:scale-95 backdrop-blur-md border border-emerald-500"
-            aria-label="Zones"
-            title="Zones"
+            onClick={handleEndTrail}
+            className="px-4 py-3 rounded-2xl bg-red-600/90 hover:bg-red-700/90 text-white shadow-2xl transition-all active:scale-95 backdrop-blur-md border border-red-500 flex items-center gap-2"
+            aria-label="End Trail"
           >
-            <Layers size={20} strokeWidth={3} />
-            <span className="font-bold text-sm whitespace-nowrap">Zones</span>
+            <X size={20} strokeWidth={3} />
+            <span className="font-bold text-sm whitespace-nowrap">End Trail</span>
           </button>
         </div>
       )}

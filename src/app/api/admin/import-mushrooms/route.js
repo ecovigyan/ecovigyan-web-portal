@@ -8,34 +8,41 @@ import { getAuthenticatedUser } from "@/lib/auth";
 // Helper function to convert Google Drive sharing link to direct image URL
 function convertGoogleDriveLink(driveLink) {
   if (!driveLink || typeof driveLink !== "string") return null;
-  
+
+  const trimmed = driveLink.trim();
+
+  // Reject non-URL values (e.g. "Mushroom visual | 253 sample")
+  if (!trimmed.startsWith("http")) return null;
+
   // If it's already a direct image URL, return as is
-  if (driveLink.includes("drive.google.com/uc?") || driveLink.includes("lh3.googleusercontent.com")) {
-    return driveLink;
+  if (trimmed.includes("drive.google.com/uc?") || trimmed.includes("lh3.googleusercontent.com")) {
+    return trimmed;
   }
-  
-  // Extract file ID from various Google Drive link formats
+
+  // Fix dash-format URLs stored with slashes replaced by dashes
+  // e.g. "https:--drive.google.com-file-d-FILE_ID-view?usp=sharing"
+  const dashMatch = trimmed.match(/file-d-([a-zA-Z0-9_-]{25,})/);
+  if (dashMatch) {
+    return `https://drive.google.com/uc?export=view&id=${dashMatch[1]}`;
+  }
+
+  // Extract file ID from standard Google Drive link formats
   let fileId = null;
-  
+
   // Format: https://drive.google.com/file/d/FILE_ID/view
-  const fileMatch = driveLink.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (fileMatch) {
-    fileId = fileMatch[1];
-  }
-  
+  const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) fileId = fileMatch[1];
+
   // Format: https://drive.google.com/open?id=FILE_ID
-  const openMatch = driveLink.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if (openMatch) {
-    fileId = openMatch[1];
-  }
-  
-  // Format: https://drive.google.com/uc?id=FILE_ID (already direct)
+  const openMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (openMatch) fileId = openMatch[1];
+
   if (fileId) {
     return `https://drive.google.com/uc?export=view&id=${fileId}`;
   }
-  
-  // If no pattern matches, return original link (might be a direct URL)
-  return driveLink;
+
+  // Return null for anything that doesn't resolve to a usable image URL
+  return null;
 }
 
 export async function POST(req) {
@@ -58,19 +65,20 @@ export async function POST(req) {
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
-        { error: "Excel file is required" },
+        { error: "Excel or CSV file is required" },
         { status: 400 }
       );
     }
 
     // Read file buffer
     const buffer = Buffer.from(await file.arrayBuffer());
-    
+
     // Dynamically import xlsx using named imports
     const { read, utils } = await import("xlsx");
-    
-    // Parse Excel file
-    const workbook = read(buffer, { type: "buffer" });
+
+    // Parse Excel or CSV file
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+    const workbook = read(buffer, { type: "buffer", raw: isCsv });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
@@ -103,18 +111,26 @@ export async function POST(req) {
       return defaultIndex;
     };
 
-    // Map columns: Photo (0), Latitude (1), Longitude (2), Name (3), Stem (4), Bottom (5), Texture (6), Role (7), Use (8)
-    const photoIndex = findColumnIndex(["photo", "image", "link", "link to photo", "google drive"], 0);
-    const latIndex = findColumnIndex(["latitude", "lat"], 1);
-    const lngIndex = findColumnIndex(["longitude", "long", "lng"], 2);
-    const nameIndex = findColumnIndex(["name", "common name", "mushroom name"], 3);
-    const stemIndex = findColumnIndex(["stem", "stem presence"], 4);
-    const bottomIndex = findColumnIndex(["bottom", "underside"], 5);
-    const textureIndex = findColumnIndex(["texture"], 6);
-    const roleIndex = findColumnIndex(["role", "ecological role"], 7);
-    const useIndex = findColumnIndex(["use", "common uses"], 8);
+    // Template column order:
+    // Photo(0), Latitude(1), Longitude(2), Common Name(3), Scientific Name(4),
+    // Stem Presence(5), Underside(6), Texture(7), Ecological Role(8), Common Uses(9)
+    //
+    // findColumnIndex searches headers by name first; falls back to default position
+    // only when the header row has no recognisable match.
+    const photoIndex          = findColumnIndex(["photo", "image", "link", "link to photo", "google drive", "photo/image", "photo/image link"], 0);
+    const latIndex            = findColumnIndex(["latitude", "lat"], 1);
+    const lngIndex            = findColumnIndex(["longitude", "long", "lng"], 2);
+    const nameIndex           = findColumnIndex(["common name", "name", "mushroom name", "species name", "fungus name", "species"], 3);
+    const scientificNameIndex = findColumnIndex(["scientific name", "scientific", "latin name", "binomial", "species (latin)"], 4);
+    // "location" / "place" column (old template) — detect so it doesn't shift defaults, but don't store it
+    findColumnIndex(["location", "place", "place name"], null);
+    const stemIndex           = findColumnIndex(["stem", "stem presence"], 5);
+    const bottomIndex         = findColumnIndex(["bottom", "underside", "bottom/underside"], 6);
+    const textureIndex        = findColumnIndex(["texture"], 7);
+    const roleIndex           = findColumnIndex(["ecological role", "role", "ecology", "fungus type"], 8);
+    const useIndex            = findColumnIndex(["common uses", "use", "uses"], 9);
 
-    console.log("Column indices:", { photoIndex, latIndex, lngIndex, nameIndex, stemIndex, bottomIndex, textureIndex, roleIndex, useIndex });
+    console.log("Column indices:", { photoIndex, latIndex, lngIndex, nameIndex, scientificNameIndex, stemIndex, bottomIndex, textureIndex, roleIndex, useIndex });
 
     // Convert raw data to objects using column indices
     const data = [];
@@ -127,6 +143,7 @@ export async function POST(req) {
       if (latIndex !== null && row[latIndex] !== undefined) rowObj.latitude = String(row[latIndex] || "").trim();
       if (lngIndex !== null && row[lngIndex] !== undefined) rowObj.longitude = String(row[lngIndex] || "").trim();
       if (nameIndex !== null && row[nameIndex] !== undefined) rowObj.name = String(row[nameIndex] || "").trim();
+      if (scientificNameIndex !== null && row[scientificNameIndex] !== undefined) rowObj.scientificName = String(row[scientificNameIndex] || "").trim();
       if (stemIndex !== null && row[stemIndex] !== undefined) rowObj.stem = String(row[stemIndex] || "").trim();
       if (bottomIndex !== null && row[bottomIndex] !== undefined) rowObj.bottom = String(row[bottomIndex] || "").trim();
       if (textureIndex !== null && row[textureIndex] !== undefined) rowObj.texture = String(row[textureIndex] || "").trim();
@@ -274,6 +291,10 @@ export async function POST(req) {
         // Add optional fields if provided
         if (name && name.trim()) {
           mushroomData.commonName = name.trim();
+        }
+
+        if (row.scientificName && row.scientificName.trim()) {
+          mushroomData.scientificName = row.scientificName.trim();
         }
 
         const normalizedStem = normalizeStemPresence(stem);
