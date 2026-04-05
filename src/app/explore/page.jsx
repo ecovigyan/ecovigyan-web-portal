@@ -1442,19 +1442,29 @@ function MapPageContent() {
                   }}
                 />
 
-                {/* Map Controls - Top Left */}
-                <div className="absolute top-6 left-6 z-20 flex flex-col gap-3 pointer-events-none">
-                  {/* Tool Row: Discovery Hub (mobile) + Filter + Zones + Trails */}
-                  <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
-                    {/* Mobile Discovery Hub Toggle */}
-                    <button
-                      onClick={() => setSidebarOpen(true)}
-                      className="md:hidden flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 font-bold text-sm hover:bg-white transition-all"
-                    >
-                      <Search size={15} />
-                      <span className="hidden xs:inline">Search</span>
-                    </button>
+                {/* Map Controls - Top Right: Search (mobile only) */}
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="md:hidden absolute top-6 right-6 z-20 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 hover:bg-white transition-all"
+                  title="Search"
+                >
+                  <Search size={18} />
+                </button>
 
+                {/* Map Controls - Top Left: Filters + Zones + Trails */}
+                <div className="absolute top-6 left-6 z-20 flex flex-col gap-3 pointer-events-none">
+                  <div className="flex items-center gap-2 pointer-events-auto">
+                    {/* Desktop sidebar toggle — only shown when sidebar is closed */}
+                    {!sidebarOpen && (
+                      <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 font-bold text-sm hover:bg-white transition-all"
+                        title="Open Discovery Hub"
+                      >
+                        <Search size={15} />
+                        <span>Search</span>
+                      </button>
+                    )}
                     {/* Filter Button */}
                     <MapFilter
                       onFilterToggle={handleHeaderFilterToggle}

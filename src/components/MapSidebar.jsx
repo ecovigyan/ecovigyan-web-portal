@@ -51,9 +51,10 @@ export default function MapSidebar({
               {/* Discovery Hub Heading */}
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-emerald-950 text-lg">Discovery Hub</h3>
-                <button 
-                  onClick={onClose} 
-                  className="md:hidden p-2 hover:bg-emerald-50 rounded-xl text-emerald-400"
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-emerald-50 rounded-xl text-emerald-400 transition-colors"
+                  title="Close sidebar"
                 >
                   <X size={20} />
                 </button>
