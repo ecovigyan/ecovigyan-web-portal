@@ -2,6 +2,14 @@ import { connectDB } from "@/lib/mongodb";
 import Article from "@/models/Article";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { sanitizeArticleHtml } from "@/lib/articleContent.server";
+import { getArticleTextLength } from "@/lib/articleContent.shared";
+import {
+  ARTICLE_CONTENT_MAX_LENGTH,
+  ARTICLE_CONTENT_MIN_LENGTH,
+  ARTICLE_TITLE_MAX_LENGTH,
+  ARTICLE_TITLE_MIN_LENGTH,
+} from "@/lib/articleValidation";
 
 export async function POST(req) {
   try {
@@ -23,7 +31,8 @@ export async function POST(req) {
     const { title: rawTitle, content: rawContent, images = [] } = body;
 
     const title = rawTitle?.trim();
-    const content = rawContent?.trim();
+    const content = sanitizeArticleHtml(rawContent || "");
+    const contentLength = getArticleTextLength(content);
 
     if (!title || !content) {
       return NextResponse.json(
@@ -32,16 +41,16 @@ export async function POST(req) {
       );
     }
 
-    if (title.length < 5 || title.length > 200) {
+    if (title.length < ARTICLE_TITLE_MIN_LENGTH || title.length > ARTICLE_TITLE_MAX_LENGTH) {
       return NextResponse.json(
-        { error: "Title must be between 5 and 200 characters" },
+        { error: `Title must be between ${ARTICLE_TITLE_MIN_LENGTH} and ${ARTICLE_TITLE_MAX_LENGTH} characters` },
         { status: 400 }
       );
     }
 
-    if (content.length < 50 || content.length > 10000) {
+    if (contentLength < ARTICLE_CONTENT_MIN_LENGTH || contentLength > ARTICLE_CONTENT_MAX_LENGTH) {
       return NextResponse.json(
-        { error: "Content must be between 50 and 10000 characters" },
+        { error: `Content must be between ${ARTICLE_CONTENT_MIN_LENGTH} and ${ARTICLE_CONTENT_MAX_LENGTH} characters` },
         { status: 400 }
       );
     }

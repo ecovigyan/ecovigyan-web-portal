@@ -405,22 +405,49 @@ export default function Map(props) {
       });
     }
 
-    // Remove existing layer if it exists (to update minzoom)
+    // Remove existing point layers if they exist so we can safely recreate them.
+    if (map.getLayer("mushroom-point-fallback")) {
+      map.removeLayer("mushroom-point-fallback");
+    }
     if (map.getLayer("mushroom-points")) {
       map.removeLayer("mushroom-points");
     }
 
-    // Create layer with higher minzoom (9) so icons only appear when zoomed in more
-    // Previously was 6, now requires zoom level 9 or higher
+    // Add a circle fallback so coordinates are still clearly visible even if the
+    // icon feels too subtle at city zoom or loads a beat later than the layer.
+    map.addLayer({
+      id: "mushroom-point-fallback",
+      type: "circle",
+      source: "mushrooms",
+      minzoom: 6.5,
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6.5, 3,
+          8, 4.5,
+          10, 6,
+          12, 7
+        ],
+        "circle-color": "#059669",
+        "circle-stroke-color": "#ecfdf5",
+        "circle-stroke-width": 1.5,
+        "circle-opacity": 0.9,
+      },
+    });
+
+    // Show point icons a bit earlier so dense local clusters become discoverable
+    // without having to zoom all the way in first.
     if (map.hasImage("mushroom-icon")) {
       map.addLayer({
         id: "mushroom-points",
         type: "symbol",
         source: "mushrooms",
-        minzoom: 9,
+        minzoom: 7,
         layout: {
           "icon-image": "mushroom-icon",
-          "icon-size": 0.04,
+          "icon-size": 0.05,
           "icon-allow-overlap": true,
         },
       });
@@ -1412,18 +1439,30 @@ export default function Map(props) {
       });
     };
 
+    const handleMouseEnterPoint = () => {
+      map.getCanvas().style.cursor = "pointer";
+    };
+
+    const handleMouseLeavePoint = () => {
+      map.getCanvas().style.cursor = "";
+    };
+
     // IMPORTANT: prevent duplicate listeners
+    map.off("click", "mushroom-point-fallback", handleClick);
     map.off("click", "mushroom-points", handleClick);
+    map.off("mouseenter", "mushroom-point-fallback", handleMouseEnterPoint);
+    map.off("mouseenter", "mushroom-points", handleMouseEnterPoint);
+    map.off("mouseleave", "mushroom-point-fallback", handleMouseLeavePoint);
+    map.off("mouseleave", "mushroom-points", handleMouseLeavePoint);
+
+    map.on("click", "mushroom-point-fallback", handleClick);
     map.on("click", "mushroom-points", handleClick);
 
     /* ---------------- CURSOR POINTER ON HOVER ---------------- */
-    map.on("mouseenter", "mushroom-points", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-
-    map.on("mouseleave", "mushroom-points", () => {
-      map.getCanvas().style.cursor = "";
-    });
+    map.on("mouseenter", "mushroom-point-fallback", handleMouseEnterPoint);
+    map.on("mouseenter", "mushroom-points", handleMouseEnterPoint);
+    map.on("mouseleave", "mushroom-point-fallback", handleMouseLeavePoint);
+    map.on("mouseleave", "mushroom-points", handleMouseLeavePoint);
 
     // Update cursor in trail mode
     if (trailMode) {

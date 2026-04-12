@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/mongodb";
 import Article from "@/models/Article";
 import { NextResponse } from "next/server";
+import { sanitizeArticleHtml } from "@/lib/articleContent.server";
 
 // GET - Fetch all active articles
 export async function GET() {
@@ -12,7 +13,12 @@ export async function GET() {
       .populate("uploadedBy", "name username dp")
       .select("-__v");
 
-    return NextResponse.json({ articles }, { status: 200 });
+    const sanitizedArticles = articles.map((article) => ({
+      ...article.toObject(),
+      content: sanitizeArticleHtml(article.content),
+    }));
+
+    return NextResponse.json({ articles: sanitizedArticles }, { status: 200 });
   } catch (error) {
     console.error("Articles fetch error:", error);
     return NextResponse.json(

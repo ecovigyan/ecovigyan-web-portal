@@ -38,6 +38,47 @@ const Map = dynamic(() => import("@/components/Map"), {
   }
 });
 
+const getPrimaryEcologicalRole = (mushroom) => {
+  if (Array.isArray(mushroom?.ecologicalRole) && mushroom.ecologicalRole.length > 0) {
+    return mushroom.ecologicalRole[0];
+  }
+  if (typeof mushroom?.ecologicalRole === "string" && mushroom.ecologicalRole.trim()) {
+    return mushroom.ecologicalRole;
+  }
+  if (typeof mushroom?.category === "string" && mushroom.category.trim()) {
+    return mushroom.category;
+  }
+  return "Unknown";
+};
+
+const getPrimaryCommonUse = (mushroom) => {
+  if (Array.isArray(mushroom?.commonUses) && mushroom.commonUses.length > 0) {
+    return mushroom.commonUses[0];
+  }
+  if (typeof mushroom?.use === "string" && mushroom.use.trim()) {
+    return mushroom.use;
+  }
+  return "Unknown";
+};
+
+const transformMushroom = (m) => ({
+  ...m,
+  latitude: m.location?.latitude || m.latitude,
+  longitude: m.location?.longitude || m.longitude,
+  name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
+  image: m.images?.[0]?.url || m.image,
+  contributor:
+    m.submittedBy?.name ||
+    m.submittedBy?.username ||
+    m.contributor ||
+    "Anonymous",
+  info: m.description || m.info || "",
+  category: getPrimaryEcologicalRole(m),
+  use: getPrimaryCommonUse(m),
+  submittedBy: m.submittedBy,
+  images: m.images || [],
+});
+
 function MapPageContent() {
   const router = useRouter();
   const { user } = useAuth();
@@ -232,33 +273,33 @@ function MapPageContent() {
   }, [speciesSearchTerm, allData]);
 
   useEffect(() => {
+    const cacheKey = "explore-mushrooms-cache-v1";
+    const cached = typeof window !== "undefined" ? window.sessionStorage.getItem(cacheKey) : null;
+
+    if (cached) {
+      try {
+        const cachedMushrooms = JSON.parse(cached);
+        if (Array.isArray(cachedMushrooms) && cachedMushrooms.length > 0) {
+          setAllData(cachedMushrooms);
+          setData(cachedMushrooms);
+          initializeFilters(cachedMushrooms, "category");
+        }
+      } catch (error) {
+        console.warn("Failed to parse mushroom cache:", error);
+      }
+    }
+
     fetch("/api/mushrooms")
       .then((res) => res.json())
       .then((d) => {
         const mushrooms = d.mushrooms || [];
-        // Transform data to match Map component expectations
-        const transformedMushrooms = mushrooms.map((m) => ({
-          ...m,
-          latitude: m.location?.latitude || m.latitude,
-          longitude: m.location?.longitude || m.longitude,
-          name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
-          image: m.images?.[0]?.url || m.image,
-          contributor:
-            m.submittedBy?.name ||
-            m.submittedBy?.username ||
-            m.contributor ||
-            "Anonymous",
-          info: m.description || m.info || "",
-          category: m.ecologicalRole || m.category || "Unknown",
-          use: m.commonUses?.[0] || m.use || "",
-          // Preserve submittedBy for navigation
-          submittedBy: m.submittedBy,
-          // Preserve full images array with originalDriveLink
-          images: m.images || [],
-        }));
+        const transformedMushrooms = mushrooms.map(transformMushroom);
         setAllData(transformedMushrooms);
         setData(transformedMushrooms);
         initializeFilters(transformedMushrooms, "category");
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(cacheKey, JSON.stringify(transformedMushrooms));
+        }
       })
       .catch(console.error);
   }, []);
@@ -268,8 +309,8 @@ function MapPageContent() {
     dataset.forEach((item) => {
       const key =
         filterMode === "category"
-          ? item.ecologicalRole || item.category
-          : item.commonUses?.[0] || item.use;
+          ? getPrimaryEcologicalRole(item)
+          : getPrimaryCommonUse(item);
       if (key) f[key] = true;
     });
     setFilters(f);
@@ -393,16 +434,18 @@ function MapPageContent() {
         filtered = filtered.filter((item) => {
           // Handle multiple ecological roles
           const roles = Array.isArray(item.ecologicalRole) 
-            ? item.ecologicalRole 
-            : [item.ecologicalRole || item.category].filter(Boolean);
+            ? item.ecologicalRole
+            : [item.ecologicalRole].filter(Boolean);
+
+          const normalizedRoles = roles.length > 0 ? roles : [getPrimaryEcologicalRole(item)];
           
           // Show mushroom if it has at least one role that's not disabled
-          return roles.some(role => filters[role] !== false);
+          return normalizedRoles.some(role => filters[role] !== false);
         });
       }
     } else if (Object.keys(filters).length > 0 && mode === "use") {
       filtered = filtered.filter((item) => {
-        const key = item.commonUses?.[0] || item.use;
+        const key = getPrimaryCommonUse(item);
         return filters[key] !== false;
       });
     }
@@ -1094,28 +1137,16 @@ function MapPageContent() {
     const refreshed = await fetch("/api/mushrooms");
     const refreshedData = await refreshed.json();
     const mushrooms = refreshedData.mushrooms || [];
-    const transformedMushrooms = mushrooms.map((m) => ({
-      ...m,
-      latitude: m.location?.latitude || m.latitude,
-      longitude: m.location?.longitude || m.longitude,
-      name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
-      image: m.images?.[0]?.url || m.image,
-      contributor:
-        m.submittedBy?.name ||
-        m.submittedBy?.username ||
-        m.contributor ||
-        "Anonymous",
-      info: m.description || m.info || "",
-      category: m.ecologicalRole || m.category || "Unknown",
-      use: m.commonUses?.[0] || m.use || "",
-      // Preserve submittedBy for navigation
-      submittedBy: m.submittedBy,
-      // Preserve full images array with originalDriveLink
-      images: m.images || [],
-    }));
+    const transformedMushrooms = mushrooms.map(transformMushroom);
     setAllData(transformedMushrooms);
     setData(transformedMushrooms);
     initializeFilters(transformedMushrooms, "category");
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        "explore-mushrooms-cache-v1",
+        JSON.stringify(transformedMushrooms)
+      );
+    }
   };
 
   // Handle zones button click with authentication check

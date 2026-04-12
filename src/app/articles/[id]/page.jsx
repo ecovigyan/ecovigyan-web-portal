@@ -158,14 +158,9 @@ export default function ArticlePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="prose prose-lg max-w-none"
-          >
-            {article.content.split("\n\n").map((paragraph, index) => (
-              <p key={index} className="text-gray-700 leading-relaxed mb-6 text-lg">
-                {paragraph}
-              </p>
-            ))}
-          </motion.div>
+            className="article-rich-content max-w-none"
+            dangerouslySetInnerHTML={{ __html: article.content }}
+          />
 
           {/* Article Footer - Author Bio */}
           <motion.div

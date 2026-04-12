@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import ArticleCreateModal from "@/components/ArticleCreateModal";
 import ArticleDeleteModal from "@/components/ArticleDeleteModal";
+import { truncateArticleText } from "@/lib/articleContent.shared";
 
 const ARTICLES_PER_PAGE = 5;
 
@@ -88,7 +89,7 @@ export default function ArticlesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: formData.title.trim(),
-            content: formData.content.trim(),
+            content: formData.content,
             image1: newImage1 || null,
             image2: newImage2 || null,
             keepImage1,
@@ -114,7 +115,7 @@ export default function ArticlesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: formData.title.trim(),
-            content: formData.content.trim(),
+            content: formData.content,
             images,
           }),
         });
@@ -176,11 +177,6 @@ export default function ArticlesPage() {
     } finally {
       setDeleting(false);
     }
-  };
-
-  const truncateContent = (content, maxLength = 250) => {
-    if (content.length <= maxLength) return content;
-    return content.slice(0, maxLength) + "...";
   };
 
   return (
@@ -292,7 +288,7 @@ export default function ArticlesPage() {
 
                         {/* Excerpt */}
                         <p className="text-gray-700 leading-relaxed mb-6">
-                          {truncateContent(article.content)}
+                          {truncateArticleText(article.content)}
                         </p>
 
                         {/* Actions */}

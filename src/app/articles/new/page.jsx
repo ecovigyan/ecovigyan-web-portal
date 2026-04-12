@@ -8,6 +8,12 @@ import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { BookOpen, X, Upload, ArrowLeft, FileText, AlertCircle } from "lucide-react";
+import {
+  ARTICLE_CONTENT_MAX_LENGTH,
+  ARTICLE_CONTENT_MIN_LENGTH,
+  ARTICLE_TITLE_MAX_LENGTH,
+  ARTICLE_TITLE_MIN_LENGTH,
+} from "@/lib/articleValidation";
 
 export default function NewArticlePage() {
   const router = useRouter();
@@ -96,13 +102,13 @@ export default function NewArticlePage() {
       return;
     }
 
-    if (formData.title.trim().length < 5 || formData.title.trim().length > 200) {
-      toast.error("Title must be between 5 and 200 characters");
+    if (formData.title.trim().length < ARTICLE_TITLE_MIN_LENGTH || formData.title.trim().length > ARTICLE_TITLE_MAX_LENGTH) {
+      toast.error(`Title must be between ${ARTICLE_TITLE_MIN_LENGTH} and ${ARTICLE_TITLE_MAX_LENGTH} characters`);
       return;
     }
 
-    if (formData.content.trim().length < 50 || formData.content.trim().length > 10000) {
-      toast.error("Content must be between 50 and 10000 characters");
+    if (formData.content.trim().length < ARTICLE_CONTENT_MIN_LENGTH || formData.content.trim().length > ARTICLE_CONTENT_MAX_LENGTH) {
+      toast.error(`Content must be between ${ARTICLE_CONTENT_MIN_LENGTH} and ${ARTICLE_CONTENT_MAX_LENGTH} characters`);
       return;
     }
 
@@ -145,8 +151,8 @@ export default function NewArticlePage() {
 
   const titleCharCount = formData.title.length;
   const contentCharCount = formData.content.length;
-  const titleColor = titleCharCount < 5 ? "text-red-600" : titleCharCount > 200 ? "text-red-600" : "text-emerald-600";
-  const contentColor = contentCharCount < 50 ? "text-red-600" : contentCharCount > 10000 ? "text-red-600" : "text-emerald-600";
+  const titleColor = titleCharCount < ARTICLE_TITLE_MIN_LENGTH || titleCharCount > ARTICLE_TITLE_MAX_LENGTH ? "text-red-600" : "text-emerald-600";
+  const contentColor = contentCharCount < ARTICLE_CONTENT_MIN_LENGTH || contentCharCount > ARTICLE_CONTENT_MAX_LENGTH ? "text-red-600" : "text-emerald-600";
 
   // Show loading or unauthorized message
   if (authLoading) {
@@ -217,23 +223,23 @@ export default function NewArticlePage() {
                   Title <span className="text-red-500">*</span>
                 </label>
                 <span className={`text-xs font-semibold ${titleColor}`}>
-                  {titleCharCount}/200
+                  {titleCharCount}/{ARTICLE_TITLE_MAX_LENGTH}
                 </span>
               </div>
               <input
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter article title (5-200 characters)"
+                placeholder={`Enter article title (${ARTICLE_TITLE_MIN_LENGTH}-${ARTICLE_TITLE_MAX_LENGTH} characters)`}
                 required
-                minLength={5}
-                maxLength={200}
+                minLength={ARTICLE_TITLE_MIN_LENGTH}
+                maxLength={ARTICLE_TITLE_MAX_LENGTH}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
               />
-              {titleCharCount > 0 && titleCharCount < 5 && (
+              {titleCharCount > 0 && titleCharCount < ARTICLE_TITLE_MIN_LENGTH && (
                 <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
-                  Title must be at least 5 characters
+                  {`Title must be at least ${ARTICLE_TITLE_MIN_LENGTH} characters`}
                 </p>
               )}
             </div>
@@ -245,23 +251,23 @@ export default function NewArticlePage() {
                   Content <span className="text-red-500">*</span>
                 </label>
                 <span className={`text-xs font-semibold ${contentColor}`}>
-                  {contentCharCount}/10,000
+                  {contentCharCount}/{ARTICLE_CONTENT_MAX_LENGTH.toLocaleString()}
                 </span>
               </div>
               <textarea
                 value={formData.content}
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                placeholder="Write your article content here (50-10,000 characters)..."
+                placeholder={`Write your article content here (${ARTICLE_CONTENT_MIN_LENGTH}-${ARTICLE_CONTENT_MAX_LENGTH.toLocaleString()} characters)...`}
                 required
-                minLength={50}
-                maxLength={10000}
+                minLength={ARTICLE_CONTENT_MIN_LENGTH}
+                maxLength={ARTICLE_CONTENT_MAX_LENGTH}
                 rows={15}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 resize-none transition-colors"
               />
-              {contentCharCount > 0 && contentCharCount < 50 && (
+              {contentCharCount > 0 && contentCharCount < ARTICLE_CONTENT_MIN_LENGTH && (
                 <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
-                  Content must be at least 50 characters
+                  {`Content must be at least ${ARTICLE_CONTENT_MIN_LENGTH} characters`}
                 </p>
               )}
             </div>
@@ -362,7 +368,7 @@ export default function NewArticlePage() {
               </Link>
               <button
                 type="submit"
-                disabled={uploading || titleCharCount < 5 || contentCharCount < 50}
+                disabled={uploading || titleCharCount < ARTICLE_TITLE_MIN_LENGTH || contentCharCount < ARTICLE_CONTENT_MIN_LENGTH || titleCharCount > ARTICLE_TITLE_MAX_LENGTH || contentCharCount > ARTICLE_CONTENT_MAX_LENGTH}
                 className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {uploading ? (

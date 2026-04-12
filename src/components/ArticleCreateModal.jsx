@@ -2,8 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, FileText, ImageIcon, AlertCircle } from "lucide-react";
+import { X, Upload, FileText, AlertCircle } from "lucide-react";
 import Image from "next/image";
+import ArticleRichTextEditor from "@/components/ArticleRichTextEditor";
+import { getArticleTextLength } from "@/lib/articleContent.shared";
+import {
+  ARTICLE_CONTENT_MAX_LENGTH,
+  ARTICLE_CONTENT_MIN_LENGTH,
+  ARTICLE_TITLE_MAX_LENGTH,
+  ARTICLE_TITLE_MIN_LENGTH,
+} from "@/lib/articleValidation";
 
 export default function ArticleCreateModal({ 
   isOpen, 
@@ -51,19 +59,20 @@ export default function ArticleCreateModal({
 
   const validateForm = () => {
     const newErrors = {};
+    const contentLength = getArticleTextLength(formData.content);
 
-    // Title validation (5-200 characters)
-    if (formData.title.length < 5) {
-      newErrors.title = "Title must be at least 5 characters";
-    } else if (formData.title.length > 200) {
-      newErrors.title = "Title cannot exceed 200 characters";
+    // Title validation
+    if (formData.title.length < ARTICLE_TITLE_MIN_LENGTH) {
+      newErrors.title = `Title must be at least ${ARTICLE_TITLE_MIN_LENGTH} characters`;
+    } else if (formData.title.length > ARTICLE_TITLE_MAX_LENGTH) {
+      newErrors.title = `Title cannot exceed ${ARTICLE_TITLE_MAX_LENGTH} characters`;
     }
 
-    // Content validation (50-10,000 characters)
-    if (formData.content.length < 50) {
-      newErrors.content = "Content must be at least 50 characters";
-    } else if (formData.content.length > 10000) {
-      newErrors.content = "Content cannot exceed 10,000 characters";
+    // Content validation
+    if (contentLength < ARTICLE_CONTENT_MIN_LENGTH) {
+      newErrors.content = `Content must be at least ${ARTICLE_CONTENT_MIN_LENGTH} characters`;
+    } else if (contentLength > ARTICLE_CONTENT_MAX_LENGTH) {
+      newErrors.content = `Content cannot exceed ${ARTICLE_CONTENT_MAX_LENGTH.toLocaleString()} characters`;
     }
 
     setErrors(newErrors);
@@ -145,9 +154,9 @@ export default function ArticleCreateModal({
   if (!isOpen) return null;
 
   const titleCharCount = formData.title.length;
-  const contentCharCount = formData.content.length;
-  const titleColor = titleCharCount < 5 ? "text-red-600" : titleCharCount > 200 ? "text-red-600" : "text-emerald-600";
-  const contentColor = contentCharCount < 50 ? "text-red-600" : contentCharCount > 10000 ? "text-red-600" : "text-emerald-600";
+  const contentCharCount = getArticleTextLength(formData.content);
+  const titleColor = titleCharCount < ARTICLE_TITLE_MIN_LENGTH || titleCharCount > ARTICLE_TITLE_MAX_LENGTH ? "text-red-600" : "text-emerald-600";
+  const contentColor = contentCharCount < ARTICLE_CONTENT_MIN_LENGTH || contentCharCount > ARTICLE_CONTENT_MAX_LENGTH ? "text-red-600" : "text-emerald-600";
 
   return (
     <AnimatePresence>
@@ -195,20 +204,20 @@ export default function ArticleCreateModal({
                     Title <span className="text-red-500">*</span>
                   </label>
                   <span className={`text-xs font-semibold ${titleColor}`}>
-                    {titleCharCount}/200
+                    {titleCharCount}/{ARTICLE_TITLE_MAX_LENGTH}
                   </span>
                 </div>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Enter article title (5-200 characters)"
+                  placeholder={`Enter article title (${ARTICLE_TITLE_MIN_LENGTH}-${ARTICLE_TITLE_MAX_LENGTH} characters)`}
                   className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors ${
                     errors.title
                       ? "border-red-300 focus:border-red-500"
                       : "border-gray-200 focus:border-emerald-500"
                   }`}
-                  maxLength={200}
+                  maxLength={ARTICLE_TITLE_MAX_LENGTH}
                 />
                 {errors.title && (
                   <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
@@ -225,21 +234,24 @@ export default function ArticleCreateModal({
                     Content <span className="text-red-500">*</span>
                   </label>
                   <span className={`text-xs font-semibold ${contentColor}`}>
-                    {contentCharCount}/10,000
+                    {contentCharCount}/{ARTICLE_CONTENT_MAX_LENGTH.toLocaleString()}
                   </span>
                 </div>
-                <textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="Write your article content here (50-10,000 characters)..."
-                  rows={12}
-                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none resize-none transition-colors ${
-                    errors.content
-                      ? "border-red-300 focus:border-red-500"
-                      : "border-gray-200 focus:border-emerald-500"
+                <div
+                  className={`rounded-2xl transition-colors ${
+                    errors.content ? "ring-2 ring-red-300" : ""
                   }`}
-                  maxLength={10000}
-                />
+                >
+                  <ArticleRichTextEditor
+                    value={formData.content}
+                    onChange={(content) => setFormData({ ...formData, content })}
+                    placeholder="Paste from Word or write your article content here..."
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  You can paste directly from Microsoft Word or import a `.docx` file. Headings, colors, bold text, and lists will be preserved where possible.
+                </p>
                 {errors.content && (
                   <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
@@ -359,13 +371,13 @@ export default function ArticleCreateModal({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={
-                isSubmitting ||
-                titleCharCount < 5 ||
-                titleCharCount > 200 ||
-                contentCharCount < 50 ||
-                contentCharCount > 10000
-              }
+                disabled={
+                  isSubmitting ||
+                  titleCharCount < ARTICLE_TITLE_MIN_LENGTH ||
+                  titleCharCount > ARTICLE_TITLE_MAX_LENGTH ||
+                  contentCharCount < ARTICLE_CONTENT_MIN_LENGTH ||
+                  contentCharCount > ARTICLE_CONTENT_MAX_LENGTH
+                }
               className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting ? (

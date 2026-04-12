@@ -132,6 +132,8 @@ const MushroomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+MushroomSchema.index({ status: 1, approvedAt: -1 });
+
 // Delete cached model to force reload of updated schema
 if (mongoose.models.Mushroom) {
   delete mongoose.models.Mushroom;

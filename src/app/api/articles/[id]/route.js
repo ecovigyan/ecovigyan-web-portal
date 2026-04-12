@@ -4,6 +4,14 @@ import cloudinary from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { sanitizeArticleHtml } from "@/lib/articleContent.server";
+import { getArticleTextLength } from "@/lib/articleContent.shared";
+import {
+  ARTICLE_CONTENT_MAX_LENGTH,
+  ARTICLE_CONTENT_MIN_LENGTH,
+  ARTICLE_TITLE_MAX_LENGTH,
+  ARTICLE_TITLE_MIN_LENGTH,
+} from "@/lib/articleValidation";
 
 // GET - Fetch a single article by ID (public)
 export async function GET(req, { params }) {
@@ -36,7 +44,7 @@ export async function GET(req, { params }) {
     const articleData = {
       _id: article._id.toString(),
       title: article.title,
-      content: article.content,
+      content: sanitizeArticleHtml(article.content),
       images: article.images,
       uploadedBy: article.uploadedBy,
       status: article.status,
@@ -103,12 +111,15 @@ export async function PUT(req, { params }) {
     } = body;
 
     const title = rawTitle?.trim();
-    const content = rawContent?.trim();
+    const content =
+      rawContent === undefined || rawContent === null
+        ? undefined
+        : sanitizeArticleHtml(rawContent);
 
     if (title !== undefined && title !== null) {
-      if (!title || title.length < 5 || title.length > 200) {
+      if (!title || title.length < ARTICLE_TITLE_MIN_LENGTH || title.length > ARTICLE_TITLE_MAX_LENGTH) {
         return NextResponse.json(
-          { error: "Title must be between 5 and 200 characters" },
+          { error: `Title must be between ${ARTICLE_TITLE_MIN_LENGTH} and ${ARTICLE_TITLE_MAX_LENGTH} characters` },
           { status: 400 }
         );
       }
@@ -116,9 +127,10 @@ export async function PUT(req, { params }) {
     }
 
     if (content !== undefined && content !== null) {
-      if (!content || content.length < 50 || content.length > 10000) {
+      const contentLength = getArticleTextLength(content);
+      if (!content || contentLength < ARTICLE_CONTENT_MIN_LENGTH || contentLength > ARTICLE_CONTENT_MAX_LENGTH) {
         return NextResponse.json(
-          { error: "Content must be between 50 and 10000 characters" },
+          { error: `Content must be between ${ARTICLE_CONTENT_MIN_LENGTH} and ${ARTICLE_CONTENT_MAX_LENGTH} characters` },
           { status: 400 }
         );
       }
@@ -168,7 +180,7 @@ export async function PUT(req, { params }) {
       article: {
         id: article._id.toString(),
         title: article.title,
-        content: article.content,
+        content: sanitizeArticleHtml(article.content),
         images: article.images,
         uploadedBy: article.uploadedBy,
         updatedAt: article.updatedAt,

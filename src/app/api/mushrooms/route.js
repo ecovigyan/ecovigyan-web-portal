@@ -15,10 +15,22 @@ export async function GET(req) {
     if (category) query.category = category;
 
     const mushrooms = await Mushroom.find(query)
+      .select(
+        "commonName images location photoDateTime submittedBy ecologicalRole texture underside fruitingSurface stemPresence commonUses scientificName description status approvedAt createdAt"
+      )
       .populate("submittedBy", "name username dp")
-      .sort({ approvedAt: -1 });
+      .sort({ approvedAt: -1 })
+      .lean();
 
-    return NextResponse.json({ mushrooms }, { status: 200 });
+    return NextResponse.json(
+      { mushrooms },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (err) {
     console.error("GET mushrooms error:", err);
     return NextResponse.json(
