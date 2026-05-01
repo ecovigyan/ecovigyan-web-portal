@@ -1448,7 +1448,7 @@ function MapPageContent() {
                   className="md:hidden absolute z-20 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-emerald-100 shadow-lg text-emerald-700 hover:bg-white transition-all"
                   style={{
                     top: "max(4.5rem, calc(env(safe-area-inset-top, 0px) + 4.25rem))",
-                    left: "max(0.5rem, calc(env(safe-area-inset-left, 0px) + 0.5rem))",
+                    left: "max(1.5rem, calc(env(safe-area-inset-left, 0px) + 1.5rem))",
                   }}
                   title="Search"
                 >
