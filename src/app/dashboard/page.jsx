@@ -176,7 +176,10 @@ export default function Dashboard() {
   };
 
   const updateObservationStatus = async (id, status, rejectionReason) => {
-    const action = status === 'approved' ? 'approve' : 'reject';
+    const action =
+      status === 'approved' ? 'approve' :
+      status === 'rejected' ? 'reject' :
+      'pending';
     setObservationLoading(id, action, true);
     
     try {
@@ -184,6 +187,7 @@ export default function Dashboard() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
+          action,
           status,
           ...(rejectionReason && { rejectionReason })
         })

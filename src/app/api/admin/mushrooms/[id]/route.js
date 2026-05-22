@@ -79,9 +79,20 @@ export async function PATCH(req, { params }) {
       stemPresence,
       commonUses,
       adminNotes,
+      status,
       action,
       rejectionReason,
     } = body;
+
+    const moderationAction =
+      action ||
+      (status === "approved"
+        ? "approve"
+        : status === "rejected"
+        ? "reject"
+        : status === "pending"
+        ? "pending"
+        : null);
 
     /* ================= UPDATE FIELDS ================= */
     const updateData = {};
@@ -118,7 +129,7 @@ export async function PATCH(req, { params }) {
     }
 
     /* ================= HANDLE STATUS ================= */
-    if (action === "approve") {
+    if (moderationAction === "approve") {
       const wasApproved = mushroom.status === "approved";
       updateData.status = "approved";
       updateData.reviewedBy = admin._id;
@@ -131,7 +142,7 @@ export async function PATCH(req, { params }) {
           $inc: { points: 1 },
         });
       }
-    } else if (action === "reject") {
+    } else if (moderationAction === "reject") {
       const wasApproved = mushroom.status === "approved";
       updateData.status = "rejected";
       updateData.reviewedBy = admin._id;
@@ -143,9 +154,11 @@ export async function PATCH(req, { params }) {
           $inc: { points: -1 },
         });
       }
-    } else if (action === "pending") {
+    } else if (moderationAction === "pending") {
       const wasApproved = mushroom.status === "approved";
       updateData.status = "pending";
+      updateData.reviewedBy = null;
+      updateData.approvedAt = null;
       updateData.rejectionReason = null;
       
       // Remove points if previously approved and now set back to pending
