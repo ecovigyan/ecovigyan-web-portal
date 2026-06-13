@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { sendMushroomApprovedEmail } from "@/lib/mushroomApprovalEmail";
 
 // Bulk operations endpoint for efficient batch processing
 export async function POST(req) {
@@ -36,7 +37,11 @@ export async function POST(req) {
       const mushroomsToApprove = await Mushroom.find({
         _id: { $in: mushroomIds },
         status: { $ne: "approved" }, // Only those not already approved
-      }).select("_id submittedBy");
+      })
+        .select(
+          "_id commonName scientificName fruitingSurface texture photoDateTime images submittedBy"
+        )
+        .populate("submittedBy", "name username email");
 
       // Step 2: Bulk update all mushrooms to approved status (single MongoDB operation)
       const updateResult = await Mushroom.updateMany(
@@ -56,7 +61,9 @@ export async function POST(req) {
       const userPointsMap = new Map();
       for (const mushroom of mushroomsToApprove) {
         if (mushroom.submittedBy) {
-          const userId = mushroom.submittedBy.toString();
+          const userId = (
+            mushroom.submittedBy?._id || mushroom.submittedBy
+          ).toString();
           userPointsMap.set(userId, (userPointsMap.get(userId) || 0) + 1);
         }
       }
@@ -71,11 +78,31 @@ export async function POST(req) {
         await Promise.all(pointsUpdatePromises);
       }
 
+      const emailResults = await Promise.allSettled(
+        mushroomsToApprove.map((mushroom) =>
+          sendMushroomApprovedEmail({
+            mushroom,
+            recipient: mushroom.submittedBy,
+          })
+        )
+      );
+
+      const emailedCount = emailResults.filter(
+        (result) => result.status === "fulfilled" && result.value?.sent
+      ).length;
+
+      emailResults.forEach((result) => {
+        if (result.status === "rejected") {
+          console.error("Failed to send mushroom approval email:", result.reason);
+        }
+      });
+
       return NextResponse.json(
         {
           message: `Successfully approved ${updateResult.modifiedCount} mushroom(s)`,
           modifiedCount: updateResult.modifiedCount,
           pointsAwarded: mushroomsToApprove.length,
+          emailedCount,
         },
         { status: 200 }
       );
