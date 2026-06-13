@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { sendMushroomApprovedEmail } from "@/lib/mushroomApprovalEmail";
 
 export async function GET(req, { params }) {
   try {
@@ -128,6 +129,8 @@ export async function PATCH(req, { params }) {
       updateData.adminNotes = adminNotes || null;
     }
 
+    let shouldSendApprovalEmail = false;
+
     /* ================= HANDLE STATUS ================= */
     if (moderationAction === "approve") {
       const wasApproved = mushroom.status === "approved";
@@ -141,6 +144,11 @@ export async function PATCH(req, { params }) {
         await User.findByIdAndUpdate(mushroom.submittedBy, {
           $inc: { points: 1 },
         });
+      }
+
+      if (!wasApproved) {
+        shouldSendApprovalEmail = true;
+        await mushroom.populate("submittedBy", "name username email");
       }
     } else if (moderationAction === "reject") {
       const wasApproved = mushroom.status === "approved";
@@ -172,6 +180,21 @@ export async function PATCH(req, { params }) {
     /* ================= SAVE ================= */
     Object.assign(mushroom, updateData);
     await mushroom.save();
+
+    if (
+      shouldSendApprovalEmail &&
+      mushroom.submittedBy &&
+      typeof mushroom.submittedBy === "object"
+    ) {
+      try {
+        await sendMushroomApprovedEmail({
+          mushroom,
+          recipient: mushroom.submittedBy,
+        });
+      } catch (emailError) {
+        console.error("Failed to send mushroom approval email:", emailError);
+      }
+    }
 
     return NextResponse.json(
       { message: "Mushroom updated successfully", mushroom },
