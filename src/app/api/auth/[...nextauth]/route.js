@@ -41,6 +41,10 @@ export const authOptions = {
           throw new Error("Your account has been suspended. Please contact support.");
         }
 
+        if (user.deletedAt) {
+          throw new Error("This account has been deleted.");
+        }
+
         if (!user.password) {
           throw new Error("Please sign in with Google");
         }
@@ -84,8 +88,8 @@ export const authOptions = {
         let existingUser = await User.findOne({ email: user.email });
 
         if (existingUser) {
-          // Check if banned
-          if (existingUser.isBanned) {
+          // Check if banned or deleted
+          if (existingUser.isBanned || existingUser.deletedAt) {
             return false;
           }
           // Update last login
@@ -175,6 +179,19 @@ export const authOptions = {
         session.user.bio = token.bio;
       }
       return session;
+    },
+
+    async redirect({ url, baseUrl }) {
+      // After sign-in, send users to /explore instead of the home page.
+      // This runs server-side, so it wins over any stale callbackUrl cookie.
+      if (url === baseUrl || url === `${baseUrl}/`) {
+        return `${baseUrl}/explore`;
+      }
+      // Honour explicit relative paths (e.g. callbackUrl: "/explore")
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Honour same-origin absolute URLs
+      if (new URL(url).origin === baseUrl) return url;
+      return `${baseUrl}/explore`;
     },
   },
 

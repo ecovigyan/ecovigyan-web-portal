@@ -30,6 +30,7 @@ export default function Map(props) {
     onDrawingComplete,
     onDrawingCancel,
     onGetCurrentBoundary,
+    onResetView,
     trailMode = false,
     trailMushrooms = [],
     trailCurrentLocation = null,
@@ -189,6 +190,13 @@ export default function Map(props) {
       map.addSource("mushrooms", { type: "geojson", data: geojson });
     } else {
       map.getSource("mushrooms").setData(geojson);
+    }
+
+    // Expose a function the parent can call to fly back to the default overview
+    if (onResetView) {
+      onResetView.current = () => {
+        map.flyTo({ center: [80.5, 25.0], zoom: 3.5, duration: 1000 });
+      };
     }
 
     // Helper function to create grid-based heatmap
@@ -511,6 +519,17 @@ export default function Map(props) {
             },
           });
         }
+      }
+    } else {
+      // No active zone — remove boundary layers and clear the source so the
+      // overlay doesn't linger after the user clears the location filter.
+      if (map.getLayer("zone-boundary")) map.removeLayer("zone-boundary");
+      if (map.getLayer("zone-fill")) map.removeLayer("zone-fill");
+      if (map.getSource("zone")) {
+        map.getSource("zone").setData({
+          type: "FeatureCollection",
+          features: [],
+        });
       }
     }
 
@@ -1484,6 +1503,7 @@ export default function Map(props) {
     trailCurrentLocation,
     onTrailMushroomAdd,
     onStartTrail,
+    onResetView,
   ]);
 
   /* ---------------- DRAWING MODE ---------------- */
