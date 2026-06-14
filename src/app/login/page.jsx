@@ -22,7 +22,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/");
+      router.push("/explore");
     }
   }, [user, router]);
 
@@ -42,7 +42,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok) {
-        router.push("/");
+        router.push("/explore");
         router.refresh();
       }
     } catch (err) {
@@ -56,7 +56,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl: "/explore" });
     } catch (err) {
       setError("Google sign-in failed");
       setGoogleLoading(false);

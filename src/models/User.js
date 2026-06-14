@@ -81,6 +81,12 @@ const userSchema = new mongoose.Schema(
     /* ---------------- META ---------------- */
     lastLogin: Date,
 
+    /* ---------------- SOFT DELETE ---------------- */
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
     /* ---------------- PASSWORD RESET ---------------- */
     resetToken: {
       type: String,
