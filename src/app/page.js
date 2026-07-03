@@ -2,6 +2,7 @@
 
 import React from "react";
 import Hero from "@/components/Hero";
+import EventFlyer from "@/components/EventFlyer";
 import VisionMission from "@/components/VisionMission";
 import WhatWeDo from "@/components/WhatWeDo";
 import ImpactStats from "@/components/ImpactStats";
@@ -14,6 +15,7 @@ import CallToAction from "@/components/CallToAction";
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#F9FAF8] font-sans selection:bg-emerald-200 selection:text-emerald-900">
+      <EventFlyer />
       <Hero />
       <VisionMission />
       <WhatWeDo />
