@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export default function Hero() {
   return (
-    <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+    <section className="relative py-20 lg:py-28 overflow-hidden">
       {/* Enhanced Background Decor */}
       <div className="absolute top-0 right-0 -z-10 w-1/2 h-full bg-gradient-to-l from-emerald-50 to-transparent rounded-bl-[100px]" />
       <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/30 rounded-full blur-3xl" />
