@@ -27,7 +27,7 @@ export default function EventFlyer() {
       toast.error("Please fill in all required fields.");
       return;
     }
-    
+
     setIsSubmitting(true);
     // Simulate API registration call
     await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -52,13 +52,13 @@ export default function EventFlyer() {
         <div className="relative bg-gradient-to-br from-[#FAF8F5] via-white to-[#F2EFE8] border-2 border-emerald-900/10 rounded-[40px] shadow-xl overflow-hidden p-8 md:p-12 lg:p-16">
           {/* Decorative subtle leaves pattern representation */}
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-800/5 rounded-full blur-xl pointer-events-none" />
-          
+
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center relative z-10">
             {/* Left side info column */}
             <div className="lg:col-span-7 flex flex-col justify-between h-full">
               <div>
                 {/* Live Tag */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -72,7 +72,7 @@ export default function EventFlyer() {
                 </motion.div>
 
                 {/* Title */}
-                <motion.h2 
+                <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -81,8 +81,8 @@ export default function EventFlyer() {
                 >
                   Let's Put <span className="text-orange-600 italic">Fun</span> in <span className="text-emerald-700">Fungi</span>
                 </motion.h2>
-                
-                <motion.p 
+
+                <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -93,7 +93,7 @@ export default function EventFlyer() {
                 </motion.p>
 
                 {/* Event Highlights Quick Grid */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -143,7 +143,7 @@ export default function EventFlyer() {
                       { title: "Sneak Peek", desc: "Exclusive intro to the new illustrated book." },
                       { title: "Ask Anything", desc: "Live interactive Q&A session with the author." }
                     ].map((item, idx) => (
-                      <motion.div 
+                      <motion.div
                         key={idx}
                         initial={{ opacity: 0, x: -10 }}
                         whileInView={{ opacity: 1, x: 0 }}
@@ -165,20 +165,14 @@ export default function EventFlyer() {
               </div>
 
               {/* Action Area */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
                 className="flex flex-wrap items-center gap-4 border-t border-emerald-900/10 pt-8"
               >
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-2 bg-emerald-900 hover:bg-emerald-950 text-white px-8 py-4 rounded-full font-bold shadow-lg shadow-emerald-900/20 hover:shadow-xl transition-all group"
-                >
-                  Reserve Your Free Seat
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
+
                 <div className="text-sm text-emerald-900/60 flex items-center gap-2">
                   <Users className="w-4 h-4 text-orange-500" />
                   <span>Free registration • Limited seats remaining</span>
@@ -187,22 +181,22 @@ export default function EventFlyer() {
             </div>
 
             {/* Right side poster column */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
               className="lg:col-span-5 flex justify-center items-center"
             >
-              <div 
+              <div
                 className="relative max-w-md w-full bg-white p-4 rounded-[32px] shadow-2xl border border-emerald-900/5 group cursor-pointer"
                 onClick={() => setIsLightboxOpen(true)}
               >
                 {/* Image container */}
                 <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-emerald-50">
-                  <img 
-                    src="/images/event-fungi-live.jpeg" 
-                    alt="Let's Put Fun in Fungi Live Session Poster" 
+                  <img
+                    src="/images/event-fungi-live.jpeg"
+                    alt="Let's Put Fun in Fungi Live Session Poster"
                     className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                   />
                   {/* Zoom Overlay on Hover */}
@@ -228,7 +222,7 @@ export default function EventFlyer() {
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -237,7 +231,7 @@ export default function EventFlyer() {
             />
 
             {/* Modal Body */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -245,7 +239,7 @@ export default function EventFlyer() {
             >
               {/* Top Banner decoration */}
               <div className="bg-gradient-to-r from-emerald-900 to-emerald-800 p-8 text-white relative">
-                <button 
+                <button
                   onClick={resetForm}
                   className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
                 >
@@ -269,13 +263,13 @@ export default function EventFlyer() {
                       <label className="block text-sm font-semibold text-emerald-950 mb-2">
                         Your Name <span className="text-red-500">*</span>
                       </label>
-                      <input 
-                        type="text" 
-                        name="name" 
+                      <input
+                        type="text"
+                        name="name"
                         value={formData.name}
                         onChange={handleInputChange}
                         required
-                        placeholder="Enter your full name" 
+                        placeholder="Enter your full name"
                         className="w-full px-4 py-3 rounded-2xl border border-emerald-900/10 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 outline-none transition-all text-emerald-950 placeholder-emerald-900/30"
                       />
                     </div>
@@ -284,13 +278,13 @@ export default function EventFlyer() {
                       <label className="block text-sm font-semibold text-emerald-950 mb-2">
                         Email Address <span className="text-red-500">*</span>
                       </label>
-                      <input 
-                        type="email" 
-                        name="email" 
+                      <input
+                        type="email"
+                        name="email"
                         value={formData.email}
                         onChange={handleInputChange}
                         required
-                        placeholder="you@example.com" 
+                        placeholder="you@example.com"
                         className="w-full px-4 py-3 rounded-2xl border border-emerald-900/10 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 outline-none transition-all text-emerald-950 placeholder-emerald-900/30"
                       />
                     </div>
@@ -299,7 +293,7 @@ export default function EventFlyer() {
                       <label className="block text-sm font-semibold text-emerald-950 mb-2">
                         I am registering as a <span className="text-red-500">*</span>
                       </label>
-                      <select 
+                      <select
                         name="role"
                         value={formData.role}
                         onChange={handleInputChange}
@@ -313,7 +307,7 @@ export default function EventFlyer() {
                       </select>
                     </div>
 
-                    <button 
+                    <button
                       type="submit"
                       disabled={isSubmitting}
                       className="w-full py-4 bg-emerald-900 hover:bg-emerald-950 disabled:bg-emerald-800/50 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:shadow-xl transition-all flex items-center justify-center gap-2 mt-4"
@@ -332,7 +326,7 @@ export default function EventFlyer() {
                     </button>
                   </form>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-6"
@@ -344,7 +338,7 @@ export default function EventFlyer() {
                     <p className="text-emerald-900/70 text-sm max-w-sm mx-auto mb-8 font-light">
                       Thank you for joining, <span className="font-semibold text-emerald-900">{formData.name}</span>. We've sent a confirmation email to <span className="font-semibold text-emerald-900">{formData.email}</span> with details.
                     </p>
-                    
+
                     <div className="bg-[#FAF8F5] border border-emerald-900/5 rounded-2xl p-5 mb-8 text-left max-w-md mx-auto">
                       <h5 className="font-bold text-xs text-orange-600 uppercase tracking-wider mb-2">Meeting Details</h5>
                       <p className="text-sm font-semibold text-emerald-950 flex items-center gap-2 mb-1">
@@ -355,7 +349,7 @@ export default function EventFlyer() {
                       </p>
                     </div>
 
-                    <button 
+                    <button
                       onClick={resetForm}
                       className="px-8 py-3 bg-emerald-900 hover:bg-emerald-950 text-white rounded-full font-bold shadow-md transition-all"
                     >
@@ -374,16 +368,16 @@ export default function EventFlyer() {
         {isLightboxOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsLightboxOpen(false)}
               className="fixed inset-0 bg-emerald-950/90 backdrop-blur-md"
             />
-            
+
             {/* Close Button */}
-            <button 
+            <button
               onClick={() => setIsLightboxOpen(false)}
               className="fixed top-6 right-6 text-white/80 hover:text-white p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all z-20"
               aria-label="Close flyer"
@@ -392,15 +386,15 @@ export default function EventFlyer() {
             </button>
 
             {/* Poster Image */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className="relative max-h-[85vh] max-w-[90vw] aspect-[3/4] bg-white rounded-3xl overflow-hidden shadow-2xl z-10 p-2"
             >
-              <img 
-                src="/images/event-fungi-live.jpeg" 
-                alt="Enlarged Event Poster" 
+              <img
+                src="/images/event-fungi-live.jpeg"
+                alt="Enlarged Event Poster"
                 className="w-full h-full object-contain rounded-2xl"
               />
             </motion.div>
