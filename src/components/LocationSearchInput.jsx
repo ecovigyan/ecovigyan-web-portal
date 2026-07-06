@@ -2,176 +2,180 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MapPin, X, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { getCityBoundary } from "@/lib/geocoding";
 
-export default function LocationSearchInput({ 
-  selectedZone, 
-  onZoneSelect, 
-  onZoneClear 
+async function fetchNominatimSuggestions(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`;
+    const res = await fetch(url, { headers: { "User-Agent": "EcoVigyan/1.0" } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((item) => {
+      const addr = item.address || {};
+      const place =
+        addr.city || addr.town || addr.village ||
+        addr.municipality || addr.county || addr.state_district || item.name;
+      const shortName = [place, addr.state !== place ? addr.state : null, addr.country]
+        .filter(Boolean)
+        .join(", ");
+      return {
+        displayName: shortName || item.display_name,
+        fullName: item.display_name,
+        source: "nominatim",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export default function LocationSearchInput({
+  selectedZone,
+  onZoneSelect,
+  onZoneClear,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [zones, setZones] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const inputRef = useRef(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const containerRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
-  const lastSuccessfulSearchRef = useRef(null);
+  const debounceRef = useRef(null);
   const onZoneSelectRef = useRef(onZoneSelect);
+  const justSelectedRef = useRef(false);
 
-  // Keep ref updated
   useEffect(() => {
     onZoneSelectRef.current = onZoneSelect;
   }, [onZoneSelect]);
 
-  // Fetch saved zones on mount
+  // Fetch saved zones once on mount
   useEffect(() => {
-    const fetchZones = async () => {
-      try {
-        const response = await fetch("/api/zones");
-        if (response.ok) {
-          const data = await response.json();
-          setZones(data.zones || []);
-        }
-      } catch (error) {
-        console.error("Error fetching zones:", error);
-      }
-    };
-    fetchZones();
+    fetch("/api/zones")
+      .then((r) => (r.ok ? r.json() : { zones: [] }))
+      .then((d) => setZones(d.zones || []))
+      .catch(() => {});
   }, []);
 
-  // Update search term when selectedZone changes
+  // Sync input when selectedZone changes externally
   useEffect(() => {
-    if (selectedZone?.name) {
-      setSearchTerm(selectedZone.name);
-    } else {
-      setSearchTerm("");
-    }
+    setSearchTerm(selectedZone?.name || "");
   }, [selectedZone]);
 
-  // Debounced city/location search with geocoding
+  // Suggestion fetch — only after 2+ characters
   useEffect(() => {
-    // Clear any pending timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+    clearTimeout(debounceRef.current);
 
-    const trimmedSearch = searchTerm.trim();
-
-    // If empty, clear after debounce
-    if (!trimmedSearch) {
-      searchTimeoutRef.current = setTimeout(() => {
-        if (lastSuccessfulSearchRef.current !== null) {
-          lastSuccessfulSearchRef.current = null;
-          if (onZoneSelectRef.current) {
-            onZoneSelectRef.current(null);
-          }
-        }
-        setIsSearching(false);
-        setShowSuggestions(false);
-      }, 800);
+    // Skip re-fetching when the search term change was caused by a selection
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
       return;
     }
 
-    // If same as last successful, don't refetch
-    if (trimmedSearch === lastSuccessfulSearchRef.current) {
+    const trimmed = searchTerm.trim();
+
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsFetching(false);
       return;
     }
 
-    // Show saved zones as suggestions if they match
-    const matchingZones = zones.filter((zone) =>
-      zone.name.toLowerCase().includes(trimmedSearch.toLowerCase())
-    );
-    
-    if (matchingZones.length > 0) {
-      setSuggestions(matchingZones.slice(0, 8));
-      setShowSuggestions(true);
-    }
+    // Saved zones match immediately (no network needed)
+    const zoneSuggestions = zones
+      .filter((z) => z.name.toLowerCase().includes(trimmed.toLowerCase()))
+      .slice(0, 3)
+      .map((z) => ({ ...z, source: "zone" }));
 
-    // Debounce the geocoding search
-    searchTimeoutRef.current = setTimeout(async () => {
-      // Double check it's still the same after debounce
-      if (searchTerm.trim() !== trimmedSearch) {
-        return;
-      }
+    setIsFetching(true);
 
-      setIsSearching(true);
-      try {
-        const boundary = await getCityBoundary(trimmedSearch);
-        if (boundary && boundary.boundary) {
-          lastSuccessfulSearchRef.current = trimmedSearch;
-          if (onZoneSelectRef.current) {
-            onZoneSelectRef.current(boundary);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching location boundary:", error);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 800);
+    debounceRef.current = setTimeout(async () => {
+      const geocodeSuggestions = await fetchNominatimSuggestions(trimmed);
 
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
+      // Zones first, then geocode results — dedup by display name
+      const seen = new Set(zoneSuggestions.map((z) => z.name.toLowerCase()));
+      const merged = [
+        ...zoneSuggestions,
+        ...geocodeSuggestions
+          .filter((s) => !seen.has(s.displayName?.toLowerCase()))
+          .slice(0, 6 - zoneSuggestions.length),
+      ];
+
+      setSuggestions(merged);
+      setShowSuggestions(merged.length > 0);
+      setIsFetching(false);
+    }, 400);
+
+    return () => clearTimeout(debounceRef.current);
   }, [searchTerm, zones]);
 
-  // Close suggestions when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleZoneClick = (zone) => {
-    setSearchTerm(zone.name);
+  const selectSuggestion = async (suggestion) => {
+    justSelectedRef.current = true; // prevent the searchTerm change from reopening the dropdown
     setShowSuggestions(false);
-    onZoneSelect(zone);
+    setSuggestions([]);
+    setIsFetching(false);
+
+    if (suggestion.source === "zone") {
+      setSearchTerm(suggestion.name);
+      onZoneSelectRef.current?.(suggestion);
+      return;
+    }
+
+    // Geocoded result — fetch full polygon boundary on selection
+    const name = suggestion.displayName;
+    setSearchTerm(name);
+    setIsApplying(true);
+    try {
+      const boundary = await getCityBoundary(name);
+      if (boundary) {
+        onZoneSelectRef.current?.({ ...boundary, name });
+      }
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   const handleClear = () => {
     setSearchTerm("");
+    setSuggestions([]);
     setShowSuggestions(false);
-    if (onZoneClear) {
-      onZoneClear();
-    }
+    setIsFetching(false);
+    onZoneClear?.();
   };
 
-  const handleInputChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleInputFocus = () => {
-    if (searchTerm.trim().length > 0 && suggestions.length > 0) {
-      setShowSuggestions(true);
-    }
-  };
+  const isSpinning = isFetching || isApplying;
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Input Container */}
       <div className="relative group">
-        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400 group-focus-within:text-purple-600 transition-colors z-10" size={18} />
-        
+        <MapPin
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-400 group-focus-within:text-purple-600 transition-colors z-10"
+          size={18}
+        />
+
         <input
-          ref={inputRef}
           type="text"
           value={searchTerm}
-          onChange={handleInputChange}
-          onFocus={handleInputFocus}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Search location (city, region, country)..."
           className="w-full bg-purple-50/50 rounded-2xl py-3 pl-12 pr-10 text-sm focus:outline-none border border-transparent focus:border-purple-200 focus:bg-white transition-all shadow-inner"
         />
 
-        {/* Loading or Clear Button */}
-        {isSearching ? (
+        {isSpinning ? (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
             <Loader2 size={16} className="text-purple-400 animate-spin" />
           </div>
@@ -185,41 +189,72 @@ export default function LocationSearchInput({
         ) : null}
       </div>
 
-      {/* Autocomplete Suggestions (Saved Zones) */}
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-2 bg-white border-2 border-emerald-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
-          {suggestions.map((zone, index) => (
-            <button
-              key={zone._id || index}
-              onClick={() => handleZoneClick(zone)}
-              className="w-full px-4 py-3 text-left text-sm hover:bg-emerald-50 transition-colors border-b border-emerald-100 last:border-b-0 flex items-center gap-3"
-            >
-              <MapPin size={14} className="text-emerald-600 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-emerald-950 truncate">
-                  {zone.name}
-                </div>
-                {zone.description && (
-                  <div className="text-xs text-emerald-600 truncate mt-0.5">
-                    {zone.description}
+      {/* Suggestions Dropdown */}
+      <AnimatePresence>
+        {showSuggestions && suggestions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 w-full mt-2 bg-white border border-purple-200 rounded-xl shadow-xl overflow-hidden"
+          >
+            <div className="max-h-64 overflow-y-auto">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onMouseDown={() => selectSuggestion(s)}
+                  className="w-full px-4 py-3 text-left text-sm hover:bg-purple-50 transition-colors border-b border-purple-100 last:border-b-0 flex items-center gap-3"
+                >
+                  <MapPin
+                    size={14}
+                    className={`flex-shrink-0 ${
+                      s.source === "zone" ? "text-emerald-500" : "text-purple-400"
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-800 truncate">
+                      {s.source === "zone" ? s.name : s.displayName}
+                    </div>
+                    {s.source === "zone" && s.description && (
+                      <div className="text-xs text-emerald-600 truncate mt-0.5">
+                        {s.description}
+                      </div>
+                    )}
+                    {s.source === "nominatim" &&
+                      s.fullName !== s.displayName && (
+                        <div className="text-xs text-gray-400 truncate mt-0.5">
+                          {s.fullName}
+                        </div>
+                      )}
                   </div>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+                  {s.source === "zone" && (
+                    <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                      saved
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Helper Text */}
+      {/* Helper text */}
       <div className="mt-2 text-xs text-emerald-600">
         {selectedZone ? (
           <span className="flex items-center gap-1">
             <MapPin size={10} />
-            Filtering by "{selectedZone.name}"
+            Filtering by &quot;{selectedZone.name}&quot;
           </span>
+        ) : searchTerm.trim().length === 1 ? (
+          <span>Type one more letter to search&hellip;</span>
         ) : (
           <span>
-            Search for cities, locations, or {zones.length > 0 ? `${zones.length} saved zone${zones.length !== 1 ? 's' : ''}` : 'saved zones'}
+            Search for cities, locations, or{" "}
+            {zones.length > 0
+              ? `${zones.length} saved zone${zones.length !== 1 ? "s" : ""}`
+              : "saved zones"}
           </span>
         )}
       </div>

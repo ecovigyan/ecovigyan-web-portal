@@ -67,11 +67,14 @@ const transformMushroom = (m) => ({
   longitude: m.location?.longitude || m.longitude,
   name: m.commonName || m.scientificName || m.name || "Unnamed Mushroom",
   image: m.images?.[0]?.url || m.image,
-  contributor:
-    m.submittedBy?.name ||
-    m.submittedBy?.username ||
-    m.contributor ||
-    "Anonymous",
+  contributor: (() => {
+    const name = m.submittedBy?.name;
+    const username = m.submittedBy?.username;
+    // Hide anonymised values left by soft-delete
+    if (name && !username?.startsWith("deleted_")) return name;
+    if (username && !username.startsWith("deleted_")) return username;
+    return m.contributor || "Anonymous";
+  })(),
   info: m.description || m.info || "",
   category: getPrimaryEcologicalRole(m),
   use: getPrimaryCommonUse(m),
@@ -236,6 +239,7 @@ function MapPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
   const getCurrentBoundaryRef = useRef(null);
+  const resetMapViewRef = useRef(null);
   const prevFiltersRef = useRef({ speciesSearchTerm: "", scientificNameSearchTerm: "", hasZone: false });
   const lastAddedMushroomRef = useRef(null);
   const trailModeRef = useRef(false);
@@ -253,20 +257,31 @@ function MapPageContent() {
     }
   }, []);
 
-  // Generate autocomplete suggestions from species search
+  // Generate autocomplete suggestions from species search.
+  // When the search matches a scientific name, also surface the linked common name (and vice versa)
+  // so the user can see the full species alias and pick the right one.
   useEffect(() => {
-    if (speciesSearchTerm.trim().length > 0) {
+    const term = speciesSearchTerm.trim();
+    if (term.length > 0) {
+      const termLower = term.toLowerCase();
       const uniqueNames = new Set();
       allData.forEach(obs => {
-        if (obs.commonName && obs.commonName.toLowerCase().includes(speciesSearchTerm.toLowerCase())) {
-          uniqueNames.add(obs.commonName);
+        const cn = obs.commonName || "";
+        const sn = obs.scientificName || "";
+        const cnLower = cn.toLowerCase();
+        const snLower = sn.toLowerCase();
+        const cnMatches = cnLower.includes(termLower);
+        const snMatches = snLower.includes(termLower);
+        if (cnMatches) {
+          uniqueNames.add(cn);
+          if (sn) uniqueNames.add(sn); // also suggest scientific name alias
         }
-        if (obs.scientificName && obs.scientificName.toLowerCase().includes(speciesSearchTerm.toLowerCase())) {
-          uniqueNames.add(obs.scientificName);
+        if (snMatches) {
+          uniqueNames.add(sn);
+          if (cn) uniqueNames.add(cn); // also suggest common name alias
         }
       });
-      const suggestions = Array.from(uniqueNames).slice(0, 8);
-      setAutocompleteSuggestions(suggestions);
+      setAutocompleteSuggestions(Array.from(uniqueNames).filter(Boolean).slice(0, 8));
     } else {
       setAutocompleteSuggestions([]);
     }
@@ -366,22 +381,51 @@ function MapPageContent() {
       });
     }
 
-    // Apply species search filter (common name)
+    // Build a cross-reference map from allData so that searching by scientific name
+    // also finds observations that only have the equivalent common name stored, and vice versa.
+    // e.g. if one observation has {commonName:"Fairy fingers", scientificName:"Clavaria fragilis"}
+    // then searching "clavaria fragilis" will also return observations with only commonName set.
+    const buildCrossRef = (searchLower) => {
+      const relatedCommonNames = new Set();
+      const relatedScientificNames = new Set();
+      allData.forEach((item) => {
+        const cn = (item.commonName || item.name || "").toLowerCase();
+        const sn = (item.scientificName || "").toLowerCase();
+        if (sn && sn.includes(searchLower) && cn) relatedCommonNames.add(cn);
+        if (cn && cn.includes(searchLower) && sn) relatedScientificNames.add(sn);
+      });
+      return { relatedCommonNames, relatedScientificNames };
+    };
+
+    // Apply species search filter (common name or scientific name, with cross-reference)
     if (speciesSearchTerm.trim()) {
       const searchLower = speciesSearchTerm.toLowerCase().trim();
-      filtered = filtered.filter((item) => {
-        const commonName = (item.commonName || item.name || "").toLowerCase();
-        return commonName.includes(searchLower);
-      });
-    }
-
-    // Apply scientific name search filter (from Grid)
-    if (scientificNameSearchTerm.trim()) {
-      const searchLower = scientificNameSearchTerm.toLowerCase().trim();
+      const { relatedCommonNames, relatedScientificNames } = buildCrossRef(searchLower);
       filtered = filtered.filter((item) => {
         const commonName = (item.commonName || item.name || "").toLowerCase();
         const scientificName = (item.scientificName || "").toLowerCase();
-        return commonName.includes(searchLower) || scientificName.includes(searchLower);
+        return (
+          commonName.includes(searchLower) ||
+          scientificName.includes(searchLower) ||
+          (commonName && relatedCommonNames.has(commonName)) ||
+          (scientificName && relatedScientificNames.has(scientificName))
+        );
+      });
+    }
+
+    // Apply scientific name search filter (from Grid), also with cross-reference
+    if (scientificNameSearchTerm.trim()) {
+      const searchLower = scientificNameSearchTerm.toLowerCase().trim();
+      const { relatedCommonNames, relatedScientificNames } = buildCrossRef(searchLower);
+      filtered = filtered.filter((item) => {
+        const commonName = (item.commonName || item.name || "").toLowerCase();
+        const scientificName = (item.scientificName || "").toLowerCase();
+        return (
+          commonName.includes(searchLower) ||
+          scientificName.includes(searchLower) ||
+          (commonName && relatedCommonNames.has(commonName)) ||
+          (scientificName && relatedScientificNames.has(scientificName))
+        );
       });
     }
 
@@ -579,6 +623,8 @@ function MapPageContent() {
   // Handle zone clear
   const handleZoneClear = () => {
     setSelectedZone(null);
+    setData([...allData]);
+    resetMapViewRef.current?.();
   };
 
 
@@ -1127,9 +1173,12 @@ function MapPageContent() {
   // Clear selected zone
   const handleClearZone = () => {
     setSelectedZone(null);
+    setData([...allData]);
     setDrawingMode(null);
     getCurrentBoundaryRef.current = null;
     setMapKey(prev => prev + 1);
+    // Note: mapKey remount resets position on its own; resetMapViewRef is not
+    // needed here since the new Map instance starts at default center/zoom.
   };
 
   const handleSubmissionSuccess = async () => {
@@ -1428,6 +1477,7 @@ function MapPageContent() {
                   onDrawingComplete={handleDrawingComplete}
                   onDrawingCancel={handleDrawingCancel}
                   onGetCurrentBoundary={getCurrentBoundaryRef}
+                  onResetView={resetMapViewRef}
                   trailMode={trailMode}
                   trailMushrooms={trailMushrooms}
                   trailCurrentLocation={trailCurrentLocation}

@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
 
   const loginWithGoogle = async () => {
     try {
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl: "/explore" });
     } catch (error) {
       toast.error("Google sign-in failed");
     }

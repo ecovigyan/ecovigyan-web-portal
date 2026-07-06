@@ -104,8 +104,22 @@ export async function POST(req) {
     };
 
 
-    if (commonName) mushroomData.commonName = commonName;
-    if (scientificName) mushroomData.scientificName = scientificName;
+    // Normalise names at write-time: trim whitespace and apply title case.
+    // This is safe because it is non-lossy and only affects formatting.
+    // Do NOT fuzzy-merge or auto-deduplicate here — that risks false positives
+    // on safety-critical species data (see admin canonical-name workflow instead).
+    if (commonName) {
+      mushroomData.commonName = commonName.trim().replace(/\w\S*/g, w =>
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      );
+    }
+    if (scientificName) {
+      // Scientific names: first word capitalised (genus), rest lowercase (species epithet)
+      const parts = scientificName.trim().split(/\s+/);
+      mushroomData.scientificName = parts
+        .map((p, i) => i === 0 ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : p.toLowerCase())
+        .join(" ");
+    }
     if (Array.isArray(ecologicalRole) && ecologicalRole.length)
       mushroomData.ecologicalRole = ecologicalRole;
     if (texture) mushroomData.texture = texture;

@@ -40,7 +40,7 @@ export default function SignUpPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/");
+      router.push("/explore");
     }
   }, [user, router]);
 
@@ -109,7 +109,7 @@ export default function SignUpPage() {
       });
 
       if (signInResult?.ok) {
-        router.push("/");
+        router.push("/explore");
         router.refresh();
       } else {
         // If auto-login fails, redirect to login page
@@ -128,7 +128,7 @@ export default function SignUpPage() {
   const handleGoogleSignUp = async () => {
     setGoogleLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/" });
+      await signIn("google", { callbackUrl: "/explore" });
     } catch (err) {
       setError("Google sign-up failed");
       setGoogleLoading(false);
