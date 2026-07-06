@@ -29,11 +29,29 @@ export default function EventFlyer() {
     }
 
     setIsSubmitting(true);
-    // Simulate API registration call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setIsRegistered(true);
-    toast.success("Successfully registered for the event!");
+    try {
+      const response = await fetch("/api/event-register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to register. Please try again.");
+      }
+
+      setIsRegistered(true);
+      toast.success(data.message || "Successfully registered for the event!");
+    } catch (error) {
+      console.error("Event registration error:", error);
+      toast.error(error.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -170,8 +188,15 @@ export default function EventFlyer() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
-                className="flex flex-wrap items-center gap-4 border-t border-emerald-900/10 pt-8"
+                className="flex flex-wrap items-center gap-6 border-t border-emerald-900/10 pt-8"
               >
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="px-8 py-4 bg-emerald-900 hover:bg-emerald-950 text-white rounded-full font-bold shadow-lg shadow-emerald-900/20 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+                >
+                  Register Now
+                  <ArrowRight className="w-5 h-5" />
+                </button>
 
                 <div className="text-sm text-emerald-900/60 flex items-center gap-2">
                   <Users className="w-4 h-4 text-orange-500" />
@@ -341,11 +366,19 @@ export default function EventFlyer() {
 
                     <div className="bg-[#FAF8F5] border border-emerald-900/5 rounded-2xl p-5 mb-8 text-left max-w-md mx-auto">
                       <h5 className="font-bold text-xs text-orange-600 uppercase tracking-wider mb-2">Meeting Details</h5>
-                      <p className="text-sm font-semibold text-emerald-950 flex items-center gap-2 mb-1">
-                        <Video className="w-4 h-4 text-emerald-700" /> Google Meet Live Stream
+                      <p className="text-sm font-semibold text-emerald-950 flex items-center gap-2 mb-2">
+                        <Video className="w-4 h-4 text-emerald-700" /> Google Meet Live Session
                       </p>
+                      <a
+                        href="https://meet.google.com/zpp-hgnb-zus"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center w-full py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold text-sm mb-3 shadow transition-all"
+                      >
+                        Join Google Meet
+                      </a>
                       <p className="text-xs text-emerald-900/60 leading-relaxed font-light">
-                        The Google Meet calendar invite and connection details will be sent directly to your registered email address 24 hours before the event.
+                        Please check your inbox at <span className="font-semibold">{formData.email}</span> (including spam/promotions) for the calendar invite `.ics` file.
                       </p>
                     </div>
 
