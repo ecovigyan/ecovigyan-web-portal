@@ -295,18 +295,13 @@ export function ReviewObservationModal({ isOpen, onClose, observation, onSave, o
   };
 
   const handleReject = async () => {
-    if (!formData.rejectionReason?.trim()) {
-      toast.error('Please provide a rejection reason before rejecting this observation.');
-      return;
-    }
-    
     setRejecting(true);
     try {
       // Save review data first
       await onSave(formData);
       // Then reject
       if (onReject) {
-        await onReject(fullObservation._id, formData.rejectionReason);
+        await onReject(fullObservation._id, formData.rejectionReason || "");
       }
       toast.success('Observation rejected');
       onClose();
@@ -762,8 +757,33 @@ export function ReviewObservationModal({ isOpen, onClose, observation, onSave, o
                         className="w-full px-4 py-3 border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-400 bg-white transition-all"
                         placeholder="Explain why this observation was rejected (e.g., poor image quality, insufficient data, misidentification)..."
                       />
-                      <p className="text-xs text-red-600 mt-2 font-semibold">
-                        ⚠️ Required when rejecting an observation
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {['Not a fungi', 'Duplicate observation'].map((reason) => (
+                          <button
+                            key={reason}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, rejectionReason: reason })}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 ${
+                              formData.rejectionReason === reason
+                                ? 'bg-red-600 text-white border-red-600 shadow-md'
+                                : 'bg-white text-gray-700 hover:bg-red-50 border-red-200'
+                            }`}
+                          >
+                            {reason}
+                          </button>
+                        ))}
+                        {formData.rejectionReason && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, rejectionReason: '' })}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 bg-gray-100 hover:bg-gray-200 text-gray-600 border-gray-200"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2 font-semibold">
+                        ℹ️ Optional: Provide a rejection reason or click a preset above
                       </p>
                     </div>
                   </div>

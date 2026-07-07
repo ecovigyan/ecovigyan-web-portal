@@ -92,8 +92,15 @@ export const authOptions = {
           if (existingUser.isBanned || existingUser.deletedAt) {
             return false;
           }
-          // Update last login
-          await User.findByIdAndUpdate(existingUser._id, { lastLogin: new Date() });
+          // Update last login and backfill dp if missing
+          const updates = { lastLogin: new Date() };
+          if ((!existingUser.dp || !existingUser.dp.url) && user.image) {
+            updates.dp = {
+              url: user.image,
+              public_id: "",
+            };
+          }
+          await User.findByIdAndUpdate(existingUser._id, updates);
         } else {
           // Create new user from Google profile
           const username = user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 20);
@@ -114,7 +121,7 @@ export const authOptions = {
             role: "user",
             points: 0,
             dp: {
-              url: "",
+              url: user.image || "",
               public_id: "",
             },
           });

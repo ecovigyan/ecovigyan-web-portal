@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -59,6 +59,10 @@ export default function AdminPanel() {
   const [observationToDelete, setObservationToDelete] = useState(null);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [observationToReview, setObservationToReview] = useState(null);
+  const [observationToReject, setObservationToReject] = useState(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [userForDpUpdate, setUserForDpUpdate] = useState(null);
+  const dpInputRef = useRef(null);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -419,6 +423,54 @@ export default function AdminPanel() {
       toast.error(err.message || `Failed to ${action} user`);
     } finally {
       setActionLoadingStates(prev => ({ ...prev, [targetUser._id]: false }));
+    }
+  };
+
+  const triggerDpUpload = (targetUser) => {
+    setUserForDpUpdate(targetUser);
+    if (dpInputRef.current) {
+      dpInputRef.current.click();
+    }
+  };
+
+  const handleDpFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !userForDpUpdate) return;
+
+    // Reset input value
+    e.target.value = '';
+
+    const toastId = toast.loading('Uploading profile picture...');
+    try {
+      const { uploadToCloudinary } = await import('@/lib/uploadToCloudinary');
+      const uploadRes = await uploadToCloudinary(file, { folder: 'profile_pics' });
+      
+      const newDp = {
+        url: uploadRes.secure_url,
+        public_id: uploadRes.public_id
+      };
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userForDpUpdate._id,
+          dp: newDp
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to update user profile picture');
+      }
+
+      toast.success('Profile picture updated successfully!', { id: toastId });
+      await loadUsers();
+    } catch (err) {
+      console.error('DP upload error:', err);
+      toast.error(err.message || 'Failed to update profile picture', { id: toastId });
+    } finally {
+      setUserForDpUpdate(null);
     }
   };
 
@@ -1053,8 +1105,8 @@ export default function AdminPanel() {
                                     </button>
                                     <button
                                       onClick={() => {
-                                        const reason = prompt('Enter rejection reason (visible to user):');
-                                        if (reason) updateObservationStatus(obs._id, 'rejected', reason);
+                                        setObservationToReject(obs);
+                                        setRejectionReasonInput('');
                                       }}
                                       disabled={isObservationLoading(obs._id, 'reject')}
                                       className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1208,19 +1260,38 @@ export default function AdminPanel() {
                               <tr key={targetUser._id} className="hover:bg-gray-50/50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
-                                    {targetUser.dp?.url ? (
-                                      <img
-                                        src={targetUser.dp.url}
-                                        alt={targetUser.name}
-                                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm border border-gray-200">
-                                        {targetUser.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || 'U'}
-                                      </div>
-                                    )}
+                                    <div className="relative group shrink-0">
+                                      {targetUser.dp?.url ? (
+                                        <img
+                                          src={targetUser.dp.url}
+                                          alt={targetUser.name}
+                                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm border border-gray-200">
+                                          {targetUser.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || 'U'}
+                                        </div>
+                                      )}
+                                      {/* Hover Overlay */}
+                                      <button
+                                        onClick={() => triggerDpUpload(targetUser)}
+                                        className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
+                                        title="Update profile picture"
+                                      >
+                                        <Upload className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                     <div>
-                                      <p className="font-bold text-gray-900">{targetUser.name}</p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-bold text-gray-900">{targetUser.name}</p>
+                                        <button
+                                          onClick={() => triggerDpUpload(targetUser)}
+                                          className="text-gray-400 hover:text-emerald-600 transition-colors"
+                                          title="Change profile picture"
+                                        >
+                                          <Upload className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                       <p className="text-xs text-gray-500 mt-0.5">ID: {targetUser._id ? targetUser._id.slice(-8) : ''}</p>
                                     </div>
                                   </div>
@@ -1381,11 +1452,97 @@ export default function AdminPanel() {
         onReject={(id, reason) => updateObservationStatus(id, 'rejected', reason)}
       />
 
+      {/* Rejection Confirm Modal */}
+      <AnimatePresence>
+        {observationToReject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-red-200"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <XCircle className="w-6 h-6 text-red-600" />
+                Reject Observation
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Are you sure you want to reject this observation? You can optionally choose a preset reason or write a custom one below.
+              </p>
+
+              {/* Presets */}
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {['Not a fungi', 'Duplicate observation'].map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setRejectionReasonInput(reason)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 ${
+                      rejectionReasonInput === reason
+                        ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-red-50 border-red-200'
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+                {rejectionReasonInput && (
+                  <button
+                    type="button"
+                    onClick={() => setRejectionReasonInput('')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 bg-gray-100 hover:bg-gray-200 text-gray-600 border-gray-200"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Custom Input */}
+              <textarea
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                placeholder="Custom reason (optional)..."
+                rows={3}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm mb-6 transition-all"
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setObservationToReject(null)}
+                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const id = observationToReject._id;
+                    setObservationToReject(null);
+                    await updateObservationStatus(id, 'rejected', rejectionReasonInput || undefined);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-md transition-all"
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Import Excel Modal */}
       <ImportExcelModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={loadObservations}
+      />
+
+      {/* Hidden file input for DP upload */}
+      <input
+        type="file"
+        ref={dpInputRef}
+        onChange={handleDpFileChange}
+        accept="image/*"
+        className="hidden"
       />
     </div>
   );

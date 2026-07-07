@@ -58,3 +58,82 @@ export async function GET(req) {
     );
   }
 }
+
+export async function PATCH(req) {
+  try {
+    await connectDB();
+
+    /* ================= AUTH ================= */
+    const { user: admin, error } = await getAuthenticatedUser();
+    if (!admin) {
+      return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
+    }
+
+    if (admin.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    /* ================= PARSE BODY ================= */
+    const body = await req.json();
+    const { userId, name, username, email, dp, role } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    const userToUpdate = await User.findById(userId);
+    if (!userToUpdate) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Apply updates
+    if (name !== undefined) userToUpdate.name = name;
+    if (username !== undefined) {
+      // Check if username is already taken by someone else
+      const existing = await User.findOne({ username: username.toLowerCase(), _id: { $ne: userId } });
+      if (existing) {
+        return NextResponse.json({ error: "Username is already taken" }, { status: 400 });
+      }
+      userToUpdate.username = username.toLowerCase();
+    }
+    if (email !== undefined) {
+      const existing = await User.findOne({ email: email.toLowerCase(), _id: { $ne: userId } });
+      if (existing) {
+        return NextResponse.json({ error: "Email is already registered" }, { status: 400 });
+      }
+      userToUpdate.email = email.toLowerCase();
+    }
+    if (dp !== undefined) {
+      userToUpdate.dp = dp;
+    }
+    if (role !== undefined && role !== userToUpdate.role) {
+      // Don't allow changing own role if self
+      if (userId === admin._id.toString()) {
+        return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
+      }
+      userToUpdate.role = role;
+    }
+
+    await userToUpdate.save();
+
+    return NextResponse.json({
+      message: "User updated successfully",
+      user: {
+        id: userToUpdate._id.toString(),
+        name: userToUpdate.name,
+        username: userToUpdate.username,
+        email: userToUpdate.email,
+        dp: userToUpdate.dp,
+        role: userToUpdate.role,
+        points: userToUpdate.points,
+        isBanned: userToUpdate.isBanned,
+      }
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+    return NextResponse.json(
+      { error: "Failed to update user" },
+      { status: 500 }
+    );
+  }
+}

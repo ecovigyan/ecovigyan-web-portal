@@ -164,6 +164,25 @@ export default function Map(props) {
     };
   }, [isTokenMissing]);
 
+  // Handle container resize automatically (e.g., when sidebar opens/closes or window resizes)
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || !mapContainerRef.current) return;
+
+    const container = mapContainerRef.current;
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.unobserve(container);
+      resizeObserver.disconnect();
+    };
+  }, [mapLoaded]);
+
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || !mapRef.current.isStyleLoaded())
       return;
