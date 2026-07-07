@@ -59,6 +59,8 @@ export default function AdminPanel() {
   const [observationToDelete, setObservationToDelete] = useState(null);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [observationToReview, setObservationToReview] = useState(null);
+  const [observationToReject, setObservationToReject] = useState(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -1053,8 +1055,8 @@ export default function AdminPanel() {
                                     </button>
                                     <button
                                       onClick={() => {
-                                        const reason = prompt('Enter rejection reason (visible to user):');
-                                        if (reason) updateObservationStatus(obs._id, 'rejected', reason);
+                                        setObservationToReject(obs);
+                                        setRejectionReasonInput('');
                                       }}
                                       disabled={isObservationLoading(obs._id, 'reject')}
                                       className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1380,6 +1382,83 @@ export default function AdminPanel() {
         onApprove={(id) => updateObservationStatus(id, 'approved')}
         onReject={(id, reason) => updateObservationStatus(id, 'rejected', reason)}
       />
+
+      {/* Rejection Confirm Modal */}
+      <AnimatePresence>
+        {observationToReject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-red-200"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <XCircle className="w-6 h-6 text-red-600" />
+                Reject Observation
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Are you sure you want to reject this observation? You can optionally choose a preset reason or write a custom one below.
+              </p>
+
+              {/* Presets */}
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {['Not a fungi', 'Duplicate observation'].map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setRejectionReasonInput(reason)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 ${
+                      rejectionReasonInput === reason
+                        ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-red-50 border-red-200'
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+                {rejectionReasonInput && (
+                  <button
+                    type="button"
+                    onClick={() => setRejectionReasonInput('')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border-2 bg-gray-100 hover:bg-gray-200 text-gray-600 border-gray-200"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Custom Input */}
+              <textarea
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                placeholder="Custom reason (optional)..."
+                rows={3}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm mb-6 transition-all"
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setObservationToReject(null)}
+                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const id = observationToReject._id;
+                    setObservationToReject(null);
+                    await updateObservationStatus(id, 'rejected', rejectionReasonInput || undefined);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-md transition-all"
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Import Excel Modal */}
       <ImportExcelModal
