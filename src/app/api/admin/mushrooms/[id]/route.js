@@ -148,7 +148,6 @@ export async function PATCH(req, { params }) {
 
       if (!wasApproved) {
         shouldSendApprovalEmail = true;
-        await mushroom.populate("submittedBy", "name username email");
       }
     } else if (moderationAction === "reject") {
       const wasApproved = mushroom.status === "approved";
@@ -181,16 +180,16 @@ export async function PATCH(req, { params }) {
     Object.assign(mushroom, updateData);
     await mushroom.save();
 
-    if (
-      shouldSendApprovalEmail &&
-      mushroom.submittedBy &&
-      typeof mushroom.submittedBy === "object"
-    ) {
+    if (shouldSendApprovalEmail && mushroom.submittedBy) {
       try {
-        await sendMushroomApprovedEmail({
-          mushroom,
-          recipient: mushroom.submittedBy,
-        });
+        // Populate after save to prevent Mongoose save() from depopulating the field in-memory
+        await mushroom.populate("submittedBy", "name username email");
+        if (mushroom.submittedBy && typeof mushroom.submittedBy === "object") {
+          await sendMushroomApprovedEmail({
+            mushroom,
+            recipient: mushroom.submittedBy,
+          });
+        }
       } catch (emailError) {
         console.error("Failed to send mushroom approval email:", emailError);
       }
