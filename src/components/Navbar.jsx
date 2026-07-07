@@ -1,18 +1,24 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Menu, X, User, LogOut, LayoutDashboard, Settings } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, Settings, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from './AuthModal';
+import { usePathname } from 'next/navigation';
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
+
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   const navLinks = [
     { name: 'Mushroom Mania', href: '/explore', featured: true },
@@ -107,6 +113,16 @@ export default function Navbar() {
                           </span>
                         </div>
                         <div className="p-2">
+                          {user?.role === 'admin' && (
+                            <Link
+                              href="/admin"
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 rounded-xl transition-colors text-emerald-700 font-bold border-b border-emerald-50"
+                              onClick={() => setShowUserMenu(false)}
+                            >
+                              <Shield className="w-5 h-5 text-emerald-600" />
+                              <span>Admin Panel</span>
+                            </Link>
+                          )}
                           <Link
                             href="/dashboard"
                             className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 rounded-xl transition-colors text-gray-700"
@@ -217,11 +233,11 @@ export default function Navbar() {
                     </Link>
                     {user?.role === 'admin' && (
                       <Link
-                        href="/dashboard"
-                        className="flex items-center gap-3 px-3 py-3 text-base font-medium text-emerald-900 hover:bg-emerald-50 rounded-lg"
+                        href="/admin"
+                        className="flex items-center gap-3 px-3 py-3 text-base font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg"
                         onClick={() => setIsOpen(false)}
                       >
-                        <Settings className="w-5 h-5" />
+                        <Shield className="w-5 h-5 text-emerald-600" />
                         Admin Panel
                       </Link>
                     )}
