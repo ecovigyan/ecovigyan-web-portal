@@ -22,7 +22,11 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/explore");
+      if (user.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/explore");
+      }
     }
   }, [user, router]);
 
@@ -42,7 +46,6 @@ export default function LoginPage() {
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok) {
-        router.push("/explore");
         router.refresh();
       }
     } catch (err) {

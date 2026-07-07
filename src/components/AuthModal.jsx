@@ -53,7 +53,19 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login', resetToken: 
           onClose();
           setEmail('');
           setPassword('');
-          router.refresh();
+          
+          // Check if user is admin to redirect
+          try {
+            const userRes = await fetch('/api/auth/current-user');
+            const userData = await userRes.json();
+            if (userData?.user?.role === 'admin') {
+              router.push('/admin');
+            } else {
+              router.refresh();
+            }
+          } catch (e) {
+            router.refresh();
+          }
         }
       } else if (mode === 'signup') {
         if (!name.trim()) {

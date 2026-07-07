@@ -3,9 +3,15 @@
 import React from 'react';
 import { Mail, Phone, MapPin, Facebook, Instagram, Linkedin, Youtube, Leaf, Heart } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function Footer() {
+  const pathname = usePathname();
   const currentYear = new Date().getFullYear();
+
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <footer id="contact" className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-emerald-900 text-emerald-50 relative overflow-hidden">
