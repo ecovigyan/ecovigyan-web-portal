@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -61,6 +61,8 @@ export default function AdminPanel() {
   const [observationToReview, setObservationToReview] = useState(null);
   const [observationToReject, setObservationToReject] = useState(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [userForDpUpdate, setUserForDpUpdate] = useState(null);
+  const dpInputRef = useRef(null);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -421,6 +423,54 @@ export default function AdminPanel() {
       toast.error(err.message || `Failed to ${action} user`);
     } finally {
       setActionLoadingStates(prev => ({ ...prev, [targetUser._id]: false }));
+    }
+  };
+
+  const triggerDpUpload = (targetUser) => {
+    setUserForDpUpdate(targetUser);
+    if (dpInputRef.current) {
+      dpInputRef.current.click();
+    }
+  };
+
+  const handleDpFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !userForDpUpdate) return;
+
+    // Reset input value
+    e.target.value = '';
+
+    const toastId = toast.loading('Uploading profile picture...');
+    try {
+      const { uploadToCloudinary } = await import('@/lib/uploadToCloudinary');
+      const uploadRes = await uploadToCloudinary(file, { folder: 'profile_pics' });
+      
+      const newDp = {
+        url: uploadRes.secure_url,
+        public_id: uploadRes.public_id
+      };
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userForDpUpdate._id,
+          dp: newDp
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to update user profile picture');
+      }
+
+      toast.success('Profile picture updated successfully!', { id: toastId });
+      await loadUsers();
+    } catch (err) {
+      console.error('DP upload error:', err);
+      toast.error(err.message || 'Failed to update profile picture', { id: toastId });
+    } finally {
+      setUserForDpUpdate(null);
     }
   };
 
@@ -1210,19 +1260,38 @@ export default function AdminPanel() {
                               <tr key={targetUser._id} className="hover:bg-gray-50/50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center gap-3">
-                                    {targetUser.dp?.url ? (
-                                      <img
-                                        src={targetUser.dp.url}
-                                        alt={targetUser.name}
-                                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm border border-gray-200">
-                                        {targetUser.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || 'U'}
-                                      </div>
-                                    )}
+                                    <div className="relative group shrink-0">
+                                      {targetUser.dp?.url ? (
+                                        <img
+                                          src={targetUser.dp.url}
+                                          alt={targetUser.name}
+                                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-extrabold text-sm border border-gray-200">
+                                          {targetUser.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || 'U'}
+                                        </div>
+                                      )}
+                                      {/* Hover Overlay */}
+                                      <button
+                                        onClick={() => triggerDpUpload(targetUser)}
+                                        className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
+                                        title="Update profile picture"
+                                      >
+                                        <Upload className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                     <div>
-                                      <p className="font-bold text-gray-900">{targetUser.name}</p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-bold text-gray-900">{targetUser.name}</p>
+                                        <button
+                                          onClick={() => triggerDpUpload(targetUser)}
+                                          className="text-gray-400 hover:text-emerald-600 transition-colors"
+                                          title="Change profile picture"
+                                        >
+                                          <Upload className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                       <p className="text-xs text-gray-500 mt-0.5">ID: {targetUser._id ? targetUser._id.slice(-8) : ''}</p>
                                     </div>
                                   </div>
@@ -1465,6 +1534,15 @@ export default function AdminPanel() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={loadObservations}
+      />
+
+      {/* Hidden file input for DP upload */}
+      <input
+        type="file"
+        ref={dpInputRef}
+        onChange={handleDpFileChange}
+        accept="image/*"
+        className="hidden"
       />
     </div>
   );
