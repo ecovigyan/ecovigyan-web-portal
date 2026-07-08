@@ -190,13 +190,15 @@ export default function EventFlyer() {
                 transition={{ delay: 0.4 }}
                 className="flex flex-wrap items-center gap-6 border-t border-emerald-900/10 pt-8"
               >
-                <button
-                  onClick={() => setIsModalOpen(true)}
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSeRlksLTD-ss9rCze7zWeKttcpzTY4ysYYmGMZDoqDjv3Mw1g/viewform"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-8 py-4 bg-emerald-900 hover:bg-emerald-950 text-white rounded-full font-bold shadow-lg shadow-emerald-900/20 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
                 >
                   Register Now
                   <ArrowRight className="w-5 h-5" />
-                </button>
+                </a>
 
                 <div className="text-sm text-emerald-900/60 flex items-center gap-2">
                   <Users className="w-4 h-4 text-orange-500" />
@@ -213,9 +215,11 @@ export default function EventFlyer() {
               transition={{ delay: 0.2 }}
               className="lg:col-span-5 flex justify-center items-center"
             >
-              <div
-                className="relative max-w-md w-full bg-white p-4 rounded-[32px] shadow-2xl border border-emerald-900/5 group cursor-pointer"
-                onClick={() => setIsLightboxOpen(true)}
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSeRlksLTD-ss9rCze7zWeKttcpzTY4ysYYmGMZDoqDjv3Mw1g/viewform"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative max-w-md w-full bg-white p-4 rounded-[32px] shadow-2xl border border-emerald-900/5 group cursor-pointer block"
               >
                 {/* Image container */}
                 <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-emerald-50">
@@ -227,16 +231,16 @@ export default function EventFlyer() {
                   {/* Zoom Overlay on Hover */}
                   <div className="absolute inset-0 bg-emerald-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <div className="p-3 bg-white/95 text-emerald-900 rounded-full shadow-lg flex items-center gap-2 text-sm font-semibold transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                      <ZoomIn className="w-4 h-4" />
-                      Enlarge Poster
+                      <Sparkles className="w-4 h-4 text-orange-500 animate-pulse" />
+                      Register via Google Form
                     </div>
                   </div>
                 </div>
                 {/* Tiny caption */}
                 <p className="text-center text-xs text-emerald-900/40 mt-3 font-medium uppercase tracking-wider">
-                  Click image to expand and view QR Code
+                  Click image to register via Google Form
                 </p>
-              </div>
+              </a>
             </motion.div>
           </div>
         </div>
