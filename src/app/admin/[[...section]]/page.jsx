@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +25,7 @@ import {
   ImageIcon,
   FileEdit,
   Upload,
+  Pencil,
   ChevronLeft,
   ChevronRight,
   Shield,
@@ -41,12 +42,17 @@ import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { ImportExcelModal } from '@/components/ImportExcelModal';
 
+const VALID_SECTIONS = new Set(['overview', 'observations', 'users']);
+
 export default function AdminPanel() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
+  const params = useParams();
+  const routeSection = Array.isArray(params?.section) ? params.section[0] : undefined;
+  const currentSection = routeSection && VALID_SECTIONS.has(routeSection) ? routeSection : 'overview';
   
   // Navigation Section State (sidebar option)
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState(currentSection);
   
   // Observations State
   const [observationFilter, setObservationFilter] = useState('all');
@@ -76,6 +82,9 @@ export default function AdminPanel() {
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [usersTotalCount, setUsersTotalCount] = useState(0);
+  const [selectedUserProfile, setSelectedUserProfile] = useState(null);
+  const [editingUserRole, setEditingUserRole] = useState('user');
+  const [savingUserProfile, setSavingUserProfile] = useState(false);
 
   // Stats State
   const [stats, setStats] = useState({
@@ -89,6 +98,23 @@ export default function AdminPanel() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  useEffect(() => {
+    setActiveSection(currentSection);
+  }, [currentSection]);
+
+  useEffect(() => {
+    if (routeSection && !VALID_SECTIONS.has(routeSection)) {
+      router.replace('/admin');
+    }
+  }, [routeSection, router]);
+
+  const navigateToSection = (section) => {
+    setActiveSection(section);
+    setCurrentPage(1);
+    setUsersPage(1);
+    router.push(section === 'overview' ? '/admin' : `/admin/${section}`);
+  };
 
   // Security guard
   useEffect(() => {
@@ -474,6 +500,54 @@ export default function AdminPanel() {
     }
   };
 
+  const openUserProfile = (targetUser) => {
+    setSelectedUserProfile(targetUser);
+    setEditingUserRole(targetUser.role || 'user');
+  };
+
+  const closeUserProfile = () => {
+    if (savingUserProfile) return;
+    setSelectedUserProfile(null);
+    setEditingUserRole('user');
+  };
+
+  const handleUserRoleSave = async () => {
+    if (!selectedUserProfile) return;
+
+    setSavingUserProfile(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUserProfile._id,
+          role: editingUserRole
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update user role');
+      }
+
+      setSelectedUserProfile(prev => prev ? { ...prev, role: data.user.role } : prev);
+      setUsersList(prev =>
+        prev.map(userItem =>
+          userItem._id === selectedUserProfile._id
+            ? { ...userItem, role: data.user.role }
+            : userItem
+        )
+      );
+      toast.success('User role updated successfully');
+      await loadUsers();
+    } catch (error) {
+      toast.error(error.message || 'Failed to update user role');
+    } finally {
+      setSavingUserProfile(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -560,11 +634,7 @@ export default function AdminPanel() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => {
-                      setActiveSection(item.id);
-                      setCurrentPage(1);
-                      setUsersPage(1);
-                    }}
+                    onClick={() => navigateToSection(item.id)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-sm transition-all ${
                       isActive
                         ? 'bg-emerald-800 text-white shadow-lg'
@@ -691,9 +761,8 @@ export default function AdminPanel() {
                           <div className="divide-y divide-gray-100">
                             <button
                               onClick={() => {
-                                setActiveSection('observations');
+                                navigateToSection('observations');
                                 setObservationFilter('pending');
-                                setCurrentPage(1);
                                 setShowNotifications(false);
                               }}
                               className="w-full p-4 hover:bg-gray-50 transition-all text-left"
@@ -776,9 +845,8 @@ export default function AdminPanel() {
                     {stats.pendingObservations > 0 && (
                       <button
                         onClick={() => {
-                          setActiveSection('observations');
+                          navigateToSection('observations');
                           setObservationFilter('pending');
-                          setCurrentPage(1);
                         }}
                         className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"
                       >
@@ -797,9 +865,8 @@ export default function AdminPanel() {
                     <p className="text-sm text-gray-500 font-semibold mb-4">System Ingested Data</p>
                     <button
                       onClick={() => {
-                        setActiveSection('observations');
+                        navigateToSection('observations');
                         setObservationFilter('system-imports');
-                        setCurrentPage(1);
                       }}
                       className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1"
                     >
@@ -827,7 +894,7 @@ export default function AdminPanel() {
                     </button>
 
                     <button
-                      onClick={() => setActiveSection('users')}
+                      onClick={() => navigateToSection('users')}
                       className="group flex items-center gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:shadow-md transition-all border border-blue-200 text-left w-full"
                     >
                       <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
@@ -1337,35 +1404,44 @@ export default function AdminPanel() {
                                   )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                                  {isSelf ? (
-                                    <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">You</span>
-                                  ) : isAdminRole ? (
-                                    <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">Protected Admin</span>
-                                  ) : (
+                                  <div className="flex items-center justify-end gap-2">
                                     <button
-                                      onClick={() => handleBanToggle(targetUser)}
-                                      disabled={isActionLoading}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 border ${
-                                        isBanned
-                                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                          : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
-                                      } disabled:opacity-50`}
+                                      onClick={() => openUserProfile(targetUser)}
+                                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 border bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
                                     >
-                                      {isActionLoading ? (
-                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                      ) : isBanned ? (
-                                        <>
-                                          <UserCheck className="w-3.5 h-3.5" />
-                                          Unban User
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Ban className="w-3.5 h-3.5" />
-                                          Ban User
-                                        </>
-                                      )}
+                                      <Pencil className="w-3.5 h-3.5" />
+                                      Edit
                                     </button>
-                                  )}
+                                    {isSelf ? (
+                                      <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">You</span>
+                                    ) : isAdminRole ? (
+                                      <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">Protected Admin</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleBanToggle(targetUser)}
+                                        disabled={isActionLoading}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 border ${
+                                          isBanned
+                                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                            : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
+                                        } disabled:opacity-50`}
+                                      >
+                                        {isActionLoading ? (
+                                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        ) : isBanned ? (
+                                          <>
+                                            <UserCheck className="w-3.5 h-3.5" />
+                                            Unban User
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Ban className="w-3.5 h-3.5" />
+                                            Ban User
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1544,6 +1620,169 @@ export default function AdminPanel() {
         accept="image/*"
         className="hidden"
       />
+
+      <AnimatePresence>
+        {selectedUserProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-gray-200"
+            >
+              <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-600">Volunteer Profile</p>
+                  <h3 className="text-2xl font-extrabold text-gray-900 mt-1">{selectedUserProfile.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">Review profile details and update access level.</p>
+                </div>
+                <button
+                  onClick={closeUserProfile}
+                  disabled={savingUserProfile}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-88px)] space-y-6">
+                <div className="grid lg:grid-cols-[240px_minmax(0,1fr)] gap-6">
+                  <div className="bg-emerald-950 rounded-3xl p-6 text-white">
+                    <div className="flex flex-col items-center text-center">
+                      {selectedUserProfile.dp?.url ? (
+                        <img
+                          src={selectedUserProfile.dp.url}
+                          alt={selectedUserProfile.name}
+                          className="w-28 h-28 rounded-full object-cover border-4 border-white/20"
+                        />
+                      ) : (
+                        <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-extrabold text-3xl border-4 border-white/10">
+                          {selectedUserProfile.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || 'U'}
+                        </div>
+                      )}
+                      <h4 className="text-xl font-bold mt-4">{selectedUserProfile.name}</h4>
+                      <p className="text-emerald-200 text-sm mt-1">@{selectedUserProfile.username}</p>
+                      <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/10 border border-white/10">
+                          {selectedUserProfile.isBanned ? 'Suspended' : 'Active'}
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/10 border border-white/10">
+                          {selectedUserProfile.points || 0} pts
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Email</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-2 break-all">{selectedUserProfile.email}</p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Auth Provider</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-2 capitalize">{selectedUserProfile.authProvider || 'credentials'}</p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Joined</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-2">
+                          {selectedUserProfile.createdAt ? new Date(selectedUserProfile.createdAt).toLocaleString() : 'Unknown'}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Last Login</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-2">
+                          {selectedUserProfile.lastLogin ? new Date(selectedUserProfile.lastLogin).toLocaleString() : 'No login recorded'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 p-5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Bio</p>
+                      <p className="text-sm text-gray-700 mt-3 leading-relaxed">
+                        {selectedUserProfile.bio?.trim() || 'No bio added yet.'}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 p-5 space-y-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Access Control</p>
+                          <p className="text-sm text-gray-600 mt-1">Change what this user can do across the platform.</p>
+                        </div>
+                        {selectedUserProfile._id === user.id && (
+                          <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+                            Your account
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                            Current Role
+                          </label>
+                          <div className="px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-800 capitalize">
+                            {selectedUserProfile.role}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                            Change Role
+                          </label>
+                          <select
+                            value={editingUserRole}
+                            onChange={(e) => setEditingUserRole(e.target.value)}
+                            disabled={selectedUserProfile._id === user.id || savingUserProfile}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                          >
+                            <option value="user">Volunteer</option>
+                            <option value="writer">Writer</option>
+                            <option value="admin">Administrator</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid sm:grid-cols-3 gap-3 text-xs font-semibold">
+                        <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 text-gray-600">
+                          `Volunteer` can submit and manage their own observations.
+                        </div>
+                        <div className="rounded-xl bg-purple-50 border border-purple-200 p-3 text-purple-700">
+                          `Writer` can also manage article content.
+                        </div>
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-emerald-700">
+                          `Admin` gets access to the full admin portal.
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={closeUserProfile}
+                          disabled={savingUserProfile}
+                          className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleUserRoleSave}
+                          disabled={
+                            savingUserProfile ||
+                            selectedUserProfile._id === user.id ||
+                            editingUserRole === selectedUserProfile.role
+                          }
+                          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
+                        >
+                          {savingUserProfile ? 'Saving...' : 'Save Role'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -76,6 +76,7 @@ export async function PATCH(req) {
     /* ================= PARSE BODY ================= */
     const body = await req.json();
     const { userId, name, username, email, dp, role } = body;
+    const allowedRoles = ["user", "writer", "admin"];
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -107,6 +108,9 @@ export async function PATCH(req) {
       userToUpdate.dp = dp;
     }
     if (role !== undefined && role !== userToUpdate.role) {
+      if (!allowedRoles.includes(role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
       // Don't allow changing own role if self
       if (userId === admin._id.toString()) {
         return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 });
