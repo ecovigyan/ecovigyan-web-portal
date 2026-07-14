@@ -22,6 +22,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Mushroom Mania', href: '/explore', featured: true },
+    { name: 'Store', href: '/products' },
     { name: 'Programs', href: '/programs' },
     { name: 'Get Involved', href: '/join-us' },
   ];

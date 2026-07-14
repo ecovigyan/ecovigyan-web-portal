@@ -34,7 +34,9 @@ import {
   UserCheck,
   Award,
   Globe,
-  LogOut
+  LogOut,
+  ShoppingBag,
+  ClipboardList
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ReviewObservationModal } from '@/components/ReviewObservationModal';
@@ -42,7 +44,7 @@ import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { ImportExcelModal } from '@/components/ImportExcelModal';
 
-const VALID_SECTIONS = new Set(['overview', 'observations', 'users']);
+const VALID_SECTIONS = new Set(['overview', 'observations', 'users', 'products', 'orders']);
 
 export default function AdminPanel() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -85,6 +87,33 @@ export default function AdminPanel() {
   const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [editingUserRole, setEditingUserRole] = useState('user');
   const [savingUserProfile, setSavingUserProfile] = useState(false);
+
+  // Products State
+  const [productsList, setProductsList] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    description: '',
+    specification: '',
+    price: '',
+    shippingFee: '',
+    image: '',
+    gallery: '',
+    category: 'kits',
+    stock: '',
+    isActive: true,
+    features: ''
+  });
+  const [isUploadingMainImage, setIsUploadingMainImage] = useState(false);
+  const [isUploadingGalleryImage, setIsUploadingGalleryImage] = useState(false);
+
+  // Orders State
+  const [ordersList, setOrdersList] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Stats State
   const [stats, setStats] = useState({
@@ -143,6 +172,20 @@ export default function AdminPanel() {
     }
   }, [user, activeSection, usersPage, usersSearch]);
 
+  // Load products data
+  useEffect(() => {
+    if (user?.role === 'admin' && activeSection === 'products') {
+      loadProducts();
+    }
+  }, [user, activeSection]);
+
+  // Load orders data
+  useEffect(() => {
+    if (user?.role === 'admin' && activeSection === 'orders') {
+      loadOrders();
+    }
+  }, [user, activeSection, ordersSearch]);
+
   // Initial load of counts/stats
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -197,6 +240,205 @@ export default function AdminPanel() {
       toast.error(error.message || 'Failed to load users directory');
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      setProductsLoading(true);
+      const res = await fetch('/api/products?admin=true');
+      const data = await res.json();
+      if (res.ok) {
+        setProductsList(data.products || []);
+      } else {
+        throw new Error(data.error || 'Failed to load products');
+      }
+    } catch (error) {
+      console.error('Load products error:', error);
+      toast.error(error.message || 'Failed to load products');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      if (res.ok) {
+        let orders = data.orders || [];
+        if (ordersSearch) {
+          const s = ordersSearch.toLowerCase();
+          orders = orders.filter(o => 
+            o.customerName?.toLowerCase().includes(s) || 
+            o.customerEmail?.toLowerCase().includes(s) || 
+            o.phone?.includes(s) ||
+            o._id?.toLowerCase().includes(s)
+          );
+        }
+        setOrdersList(orders);
+      } else {
+        throw new Error(data.error || 'Failed to load orders');
+      }
+    } catch (error) {
+      console.error('Load orders error:', error);
+      toast.error(error.message || 'Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleMainImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingMainImage(true);
+      const { uploadToCloudinary } = await import('@/lib/uploadToCloudinary');
+      const uploadRes = await uploadToCloudinary(file, { folder: 'products' });
+      setProductForm(prev => ({ ...prev, image: uploadRes.secure_url }));
+      toast.success('Main image uploaded successfully!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload main image');
+    } finally {
+      setIsUploadingMainImage(false);
+    }
+  };
+
+  const handleGalleryImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingGalleryImage(true);
+      const { uploadToCloudinary } = await import('@/lib/uploadToCloudinary');
+      const uploadRes = await uploadToCloudinary(file, { folder: 'products' });
+      
+      const currentGallery = productForm.gallery 
+        ? productForm.gallery.split(',').map(img => img.trim()).filter(Boolean) 
+        : [];
+      currentGallery.push(uploadRes.secure_url);
+      
+      setProductForm(prev => ({ 
+        ...prev, 
+        gallery: currentGallery.join(', ') 
+      }));
+      toast.success('Gallery image uploaded!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload gallery image');
+    } finally {
+      setIsUploadingGalleryImage(false);
+    }
+  };
+
+  const handleProductSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const isEdit = !!editingProduct;
+      const url = isEdit ? `/api/products/${editingProduct._id}` : '/api/products';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const payload = {
+        ...productForm,
+        price: Number(productForm.price),
+        shippingFee: Number(productForm.shippingFee || 0),
+        stock: Number(productForm.stock || 0),
+        gallery: productForm.gallery.split(',').map(img => img.trim()).filter(Boolean),
+        features: productForm.features.split(';').map(f => f.trim()).filter(Boolean)
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(data.message || 'Operation successful!');
+        setShowProductModal(false);
+        setEditingProduct(null);
+        setProductForm({
+          name: '',
+          description: '',
+          specification: '',
+          price: '',
+          shippingFee: '',
+          image: '',
+          gallery: '',
+          category: 'kits',
+          stock: '',
+          isActive: true,
+          features: ''
+        });
+        loadProducts();
+      } else {
+        throw new Error(data.error || 'Failed to save product');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
+    }
+  };
+
+  const handleEditProductClick = (product) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name || '',
+      description: product.description || '',
+      specification: product.specification || '',
+      price: product.price || '',
+      shippingFee: product.shippingFee || '',
+      image: product.image || '',
+      gallery: (product.gallery || []).join(', '),
+      category: product.category || 'kits',
+      stock: product.stock || '',
+      isActive: product.isActive !== undefined ? product.isActive : true,
+      features: (product.features || []).join('; ')
+    });
+    setShowProductModal(true);
+  };
+
+  const handleDeleteProductClick = async (productId) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Product deleted successfully!');
+        loadProducts();
+      } else {
+        throw new Error(data.error || 'Failed to delete product');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, updates) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || 'Order updated successfully!');
+        loadOrders();
+        if (selectedOrder && selectedOrder._id === orderId) {
+          setSelectedOrder(prev => ({ ...prev, ...updates }));
+        }
+      } else {
+        throw new Error(data.error || 'Failed to update order');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.message);
     }
   };
 
@@ -601,7 +843,9 @@ export default function AdminPanel() {
   const sidebarItems = [
     { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
     { id: 'observations', label: 'Observations Review', icon: MapPin, badge: stats.pendingObservations },
-    { id: 'users', label: 'Volunteer Directory', icon: Users }
+    { id: 'users', label: 'Volunteer Directory', icon: Users },
+    { id: 'products', label: 'Products Directory', icon: ShoppingBag },
+    { id: 'orders', label: 'Orders Registry', icon: ClipboardList }
   ];
 
   return (
@@ -717,11 +961,15 @@ export default function AdminPanel() {
                 {activeSection === 'overview' && 'Console Dashboard'}
                 {activeSection === 'observations' && 'Observations Verification'}
                 {activeSection === 'users' && 'Volunteer Directory'}
+                {activeSection === 'products' && 'Products Inventory'}
+                {activeSection === 'orders' && 'Orders Registry'}
               </h1>
               <p className="text-sm text-gray-500 mt-1 font-medium">
                 {activeSection === 'overview' && 'Platform status overview, task summary and direct quick links'}
                 {activeSection === 'observations' && 'Review and approve/reject volunteer-submitted mushroom findings'}
                 {activeSection === 'users' && 'Manage system users, view accumulated leaderboard points and ban status'}
+                {activeSection === 'products' && 'Manage e-commerce products: add, edit, or delete items and edit specifications'}
+                {activeSection === 'orders' && 'Track orders, verify shipping details, update status, and manage payment states'}
               </p>
             </div>
 
@@ -1494,6 +1742,262 @@ export default function AdminPanel() {
               </motion.div>
             )}
 
+            {/* SECTION: PRODUCTS */}
+            {activeSection === 'products' && (
+              <motion.div
+                key="products"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="space-y-6"
+              >
+                {/* Header Banner */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="text-sm text-gray-500 font-semibold text-center sm:text-left">
+                    Manage store catalog inventory items. Total products: <span className="font-bold text-gray-900">{productsList.length}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setProductForm({
+                        name: '',
+                        description: '',
+                        specification: '',
+                        price: '',
+                        shippingFee: '',
+                        image: '',
+                        gallery: '',
+                        category: 'kits',
+                        stock: '',
+                        isActive: true,
+                        features: ''
+                      });
+                      setShowProductModal(true);
+                    }}
+                    className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-600/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add New Product</span>
+                  </button>
+                </div>
+
+                {/* Products Table */}
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                  {productsLoading ? (
+                    <div className="p-12 text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                      <p className="text-gray-500">Retrieving catalog directory...</p>
+                    </div>
+                  ) : productsList.length === 0 ? (
+                    <div className="p-16 text-center text-gray-500">
+                      <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                      <p className="font-bold text-lg text-gray-700 mb-1">No products found</p>
+                      <p className="text-sm text-gray-500">Click the button above to add your first product.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold uppercase tracking-wider text-gray-500">
+                            <th className="px-6 py-4">Item Details</th>
+                            <th className="px-6 py-4">Category</th>
+                            <th className="px-6 py-4">Price / Shipping</th>
+                            <th className="px-6 py-4">Stock</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-sm font-medium text-gray-700">
+                          {productsList.map((prod) => (
+                            <tr key={prod._id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <img src={prod.image} className="w-12 h-12 rounded-lg object-cover border border-gray-200 animate-in fade-in" alt={prod.name} />
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-gray-900 truncate max-w-xs">{prod.name}</p>
+                                    <p className="text-xs text-gray-500 truncate max-w-xs">{prod.description}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs font-bold rounded-full capitalize">
+                                  {prod.category}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-gray-900">
+                                <span className="font-bold">₹{prod.price}</span>
+                                {prod.shippingFee > 0 ? (
+                                  <span className="text-xs text-amber-750 block">+ ₹{prod.shippingFee} shipping</span>
+                                ) : (
+                                  <span className="text-xs text-emerald-700 block">Free shipping</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`font-bold ${prod.stock <= 5 ? 'text-red-600 font-extrabold' : 'text-gray-900'}`}>
+                                  {prod.stock} items
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                {prod.isActive ? (
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-850 text-xs font-bold rounded-full">Active</span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-650 text-xs font-bold rounded-full">Inactive</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => handleEditProductClick(prod)}
+                                    className="p-2 hover:bg-gray-100 rounded-lg text-emerald-700 transition-colors border border-gray-200 bg-white shadow-sm"
+                                    title="Edit Product"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteProductClick(prod._id)}
+                                    className="p-2 hover:bg-red-50 rounded-lg text-red-650 transition-colors border border-gray-200 bg-white shadow-sm"
+                                    title="Delete Product"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* SECTION: ORDERS */}
+            {activeSection === 'orders' && (
+              <motion.div
+                key="orders"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="space-y-6"
+              >
+                {/* Search Header */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500 font-semibold">
+                      Manage checkout orders registry. Total orders: <span className="font-bold text-gray-900">{ordersList.length}</span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search orders by customer name, email, phone, or order ID..."
+                      value={ordersSearch}
+                      onChange={(e) => setOrdersSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-gray-50/50 text-emerald-950"
+                    />
+                  </div>
+                </div>
+
+                {/* Orders registry list */}
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                  {ordersLoading ? (
+                    <div className="p-12 text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                      <p className="text-gray-500">Retrieving orders database...</p>
+                    </div>
+                  ) : ordersList.length === 0 ? (
+                    <div className="p-16 text-center text-gray-500">
+                      <ClipboardList className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                      <p className="font-bold text-lg text-gray-700 mb-1">No orders found</p>
+                      <p className="text-sm text-gray-500">Check back later or test placing an order in the public store.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold uppercase tracking-wider text-gray-500">
+                            <th className="px-6 py-4">Order ID & Date</th>
+                            <th className="px-6 py-4">Customer Details</th>
+                            <th className="px-6 py-4">Total Amount</th>
+                            <th className="px-6 py-4">Payment Status</th>
+                            <th className="px-6 py-4">Delivery Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-sm font-medium text-gray-700">
+                          {ordersList.map((order) => {
+                            const dateStr = new Date(order.createdAt).toLocaleDateString("en-IN", {
+                              day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                            });
+                            return (
+                              <tr key={order._id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-gray-900 select-all font-mono text-xs">{order._id}</p>
+                                  <p className="text-xs text-gray-505 mt-0.5">{dateStr}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-gray-950">{order.customerName}</p>
+                                  <p className="text-xs text-gray-500 font-semibold">{order.customerEmail}</p>
+                                  <p className="text-xs text-gray-505">{order.phone}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-extrabold text-gray-900">₹{order.totalAmount}</span>
+                                  <span className="text-[10px] text-gray-400 block uppercase font-bold">{order.paymentMethod}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={order.paymentStatus}
+                                    onChange={(e) => handleUpdateOrderStatus(order._id, { paymentStatus: e.target.value })}
+                                    className={`px-2.5 py-1 text-xs font-black rounded-lg uppercase tracking-wide border cursor-pointer ${
+                                      order.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-805 border-emerald-200' :
+                                      order.paymentStatus === 'failed' ? 'bg-red-50 text-red-805 border-red-200' :
+                                      'bg-amber-50 text-amber-805 border-amber-200'
+                                    }`}
+                                  >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="failed">Failed</option>
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={order.status}
+                                    onChange={(e) => handleUpdateOrderStatus(order._id, { status: e.target.value })}
+                                    className={`px-2.5 py-1 text-xs font-black rounded-lg uppercase tracking-wide border cursor-pointer ${
+                                      order.status === 'delivered' ? 'bg-emerald-50 text-emerald-805 border-emerald-200' :
+                                      order.status === 'cancelled' ? 'bg-red-50 text-red-805 border-red-200' :
+                                      order.status === 'shipped' ? 'bg-blue-50 text-blue-805 border-blue-200' :
+                                      'bg-amber-50 text-amber-805 border-amber-200'
+                                    }`}
+                                  >
+                                    <option value="pending">Pending</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="shipped">Shipped</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="cancelled">Cancelled</option>
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={() => setSelectedOrder(order)}
+                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-xs font-bold text-gray-700 transition-colors shadow-sm inline-flex items-center gap-1"
+                                  >
+                                    View Items
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
           </AnimatePresence>
         </div>
       </main>
@@ -1783,6 +2287,388 @@ export default function AdminPanel() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* E-COMMERCE: PRODUCT ADD/EDIT MODAL */}
+      {showProductModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0" onClick={() => setShowProductModal(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden z-10"
+          >
+            <form onSubmit={handleProductSubmit}>
+              <div className="p-6 bg-emerald-950 text-white">
+                <h3 className="text-xl font-bold font-serif">{editingProduct ? 'Edit Product Item' : 'Add Catalog Product'}</h3>
+                <p className="text-xs text-emerald-300 mt-1">Provide product pricing, specifications, inventory and graphics details.</p>
+              </div>
+
+              <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Product Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Price (INR)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Shipping Fee (INR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={productForm.shippingFee}
+                      onChange={(e) => setProductForm({ ...productForm, shippingFee: e.target.value })}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Category</label>
+                    <select
+                      value={productForm.category}
+                      onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    >
+                      <option value="kits">Grow Kits</option>
+                      <option value="mushrooms">Mushrooms & Extracts</option>
+                      <option value="merch">Merchandise</option>
+                      <option value="education">Educational Media</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Stock Count</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={productForm.stock}
+                      onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Cloudinary Image Upload Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-150 pt-4">
+                  {/* Main Image Uploader */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase">Main Product Image</label>
+                    <div className="flex items-center gap-3">
+                      {productForm.image ? (
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 bg-stone-50 shrink-0">
+                          <img src={productForm.image} className="w-full h-full object-cover" alt="Main" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 bg-gray-50 shrink-0">
+                          No Image
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="text"
+                          required
+                          value={productForm.image}
+                          onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                          placeholder="Image URL or upload below..."
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs text-emerald-950 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        />
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleMainImageUpload}
+                            className="hidden"
+                            id="product-main-image-upload"
+                            disabled={isUploadingMainImage}
+                          />
+                          <label
+                            htmlFor="product-main-image-upload"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 cursor-pointer disabled:opacity-50"
+                          >
+                            {isUploadingMainImage ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3 h-3" />
+                                Upload File
+                              </>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gallery Images Uploader */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-700 uppercase">Gallery Images</label>
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="text"
+                          value={productForm.gallery}
+                          onChange={(e) => setProductForm({ ...productForm, gallery: e.target.value })}
+                          placeholder="Comma separated image URLs..."
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs text-emerald-950 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                        />
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleGalleryImageUpload}
+                            className="hidden"
+                            id="product-gallery-image-upload"
+                            disabled={isUploadingGalleryImage}
+                          />
+                          <label
+                            htmlFor="product-gallery-image-upload"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 cursor-pointer disabled:opacity-50"
+                          >
+                            {isUploadingGalleryImage ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" />
+                                Add Upload file
+                              </>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gallery Preview Thumbnails */}
+                    {productForm.gallery && (
+                      <div className="flex flex-wrap gap-2 pt-1.5">
+                        {productForm.gallery.split(',').map((imgUrl, i) => (
+                          <div key={i} className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-stone-50 shrink-0">
+                            <img src={imgUrl.trim()} className="w-full h-full object-cover" alt="Gallery" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = productForm.gallery.split(',').map(u => u.trim()).filter(Boolean);
+                                list.splice(i, 1);
+                                setProductForm(prev => ({ ...prev, gallery: list.join(', ') }));
+                              }}
+                              className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-650 text-white rounded-bl flex items-center justify-center hover:bg-red-700 text-[8px] font-bold"
+                              title="Remove image"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-150 pt-4">
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Product Description</label>
+                  <textarea
+                    required
+                    rows="3"
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Product Specifications (Separated by Semicolon)</label>
+                  <input
+                    type="text"
+                    value={productForm.specification}
+                    onChange={(e) => setProductForm({ ...productForm, specification: e.target.value })}
+                    placeholder="Weight: 1.5kg; Dimensions: 15x15x20cm; Substrate: straw"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Features Highlights (Separated by Semicolon)</label>
+                  <input
+                    type="text"
+                    value={productForm.features}
+                    onChange={(e) => setProductForm({ ...productForm, features: e.target.value })}
+                    placeholder="100% organic; First harvest in 10 days"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={productForm.isActive}
+                    onChange={(e) => setProductForm({ ...productForm, isActive: e.target.checked })}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="isActive" className="text-sm font-bold text-gray-700 cursor-pointer">Display item publicly in store</label>
+                </div>
+              </div>
+
+              <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm font-bold bg-white hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-600/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Save Product
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* E-COMMERCE: ORDER DETAILS VIEW OVERLAY */}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0" onClick={() => setSelectedOrder(null)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden z-10"
+          >
+            <div className="p-6 bg-emerald-950 text-white">
+              <h3 className="text-xl font-bold font-serif">Order Invoice Details</h3>
+              <p className="text-xs text-emerald-300 mt-1">Ref ID: {selectedOrder._id}</p>
+            </div>
+
+            <div className="p-6 space-y-5 text-sm text-gray-700 font-medium">
+              {/* Customer Section */}
+              <div className="space-y-1">
+                <p className="text-xs uppercase font-bold text-emerald-700">Customer Profile</p>
+                <p className="text-gray-900 font-bold">{selectedOrder.customerName}</p>
+                <p className="text-xs font-semibold text-gray-500">{selectedOrder.customerEmail}</p>
+                <p className="text-xs text-gray-500">Phone: {selectedOrder.phone}</p>
+              </div>
+
+              {/* Shipping address details */}
+              <div className="space-y-1 border-t border-gray-100 pt-3">
+                <p className="text-xs uppercase font-bold text-emerald-700">Shipping Destination</p>
+                <p className="text-xs leading-relaxed text-gray-600">
+                  {selectedOrder.shippingAddress?.street}, {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} - {selectedOrder.shippingAddress?.zipCode}, {selectedOrder.shippingAddress?.country}
+                </p>
+              </div>
+
+              {/* Items Ordered List */}
+              <div className="space-y-2 border-t border-gray-100 pt-3">
+                <p className="text-xs uppercase font-bold text-emerald-700">Items Catalog Details</p>
+                <div className="space-y-2">
+                  {selectedOrder.items?.map((item, i) => (
+                    <div key={i} className="flex justify-between items-center text-xs bg-gray-50 border border-gray-100 rounded-xl p-3">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">{item.name}</p>
+                        <p className="text-gray-505 font-medium">{item.quantity} units × ₹{item.price}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold text-gray-900">₹{item.price * item.quantity}</p>
+                        {item.shippingFee > 0 && (
+                          <p className="text-[10px] text-amber-705">+ ₹{item.shippingFee} shipping</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Billing Summary */}
+              <div className="flex justify-between items-center border-t border-gray-100 pt-3 text-base">
+                <span className="font-bold text-emerald-950">Total Amount Due</span>
+                <span className="font-extrabold text-emerald-800 text-lg">₹{selectedOrder.totalAmount}</span>
+              </div>
+
+              {/* UPI Payment Proof Verification */}
+              {selectedOrder.paymentProof && (
+                <div className="space-y-1.5 border-t border-gray-100 pt-3">
+                  <p className="text-xs uppercase font-bold text-emerald-700">UPI Payment Proof Receipt</p>
+                  <div className="relative border border-gray-200 rounded-2xl overflow-hidden bg-gray-50 max-h-48 flex items-center justify-center p-2 hover:bg-gray-100 transition-colors">
+                    <a href={selectedOrder.paymentProof} target="_blank" rel="noopener noreferrer" className="block w-full text-center">
+                      <img
+                        src={selectedOrder.paymentProof}
+                        className="max-h-40 mx-auto object-contain rounded-lg"
+                        alt="Payment Proof Receipt Screenshot"
+                      />
+                      <p className="text-[10px] text-gray-500 font-bold mt-1">Click to open full-size screenshot</p>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Order statuses */}
+              <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Status</label>
+                  <select
+                    value={selectedOrder.paymentStatus}
+                    onChange={(e) => handleUpdateOrderStatus(selectedOrder._id, { paymentStatus: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-gray-300 bg-white text-emerald-950 cursor-pointer"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Delivery Status</label>
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => handleUpdateOrderStatus(selectedOrder._id, { status: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-gray-300 bg-white text-emerald-950 cursor-pointer"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="px-6 py-2.5 bg-gray-950 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Close Invoice
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
