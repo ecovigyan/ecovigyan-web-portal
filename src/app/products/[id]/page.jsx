@@ -442,7 +442,7 @@ export default function ProductDetailPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 30 }}
                 transition={{ type: "spring", duration: 0.5 }}
-                className="relative w-full max-w-2xl bg-white rounded-[32px] shadow-2xl border border-emerald-100 overflow-hidden z-10"
+                className="relative w-full max-w-3xl bg-white rounded-[32px] shadow-2xl border border-emerald-100 overflow-hidden z-10"
               >
                 {!orderSuccess ? (
                   // CHECKOUT FORM
@@ -455,7 +455,7 @@ export default function ProductDetailPage() {
                       </p>
                     </div>
 
-                    <div className="p-6 md:p-8 space-y-6 max-h-[60vh] overflow-y-auto">
+                    <div className="p-6 md:p-8 space-y-6 max-h-[75vh] overflow-y-auto">
                       
                       {/* Order Summary Item */}
                       <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-2xl p-4 flex gap-4 items-center">
@@ -595,9 +595,9 @@ export default function ProductDetailPage() {
                           </p>
 
                           <img
-                            src="/images/qr.png"
+                            src="/images/qr.jpeg"
                             alt="UPI QR Code for Eco Vigyan Foundation"
-                            className="w-48 h-48 mx-auto object-contain border border-emerald-200 p-2 bg-white rounded-2xl shadow-sm"
+                            className="w-72 h-72 mx-auto object-contain border border-emerald-200 p-2 bg-white rounded-2xl shadow-sm"
                           />
 
                           <div className="space-y-3 pt-2">

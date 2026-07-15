@@ -307,7 +307,7 @@ export default function DonatePage() {
                     <div className="flex justify-center mb-6">
                       <div className="bg-white p-6 rounded-2xl shadow-xl border-2 border-emerald-200">
                         <img 
-                          src="/images/qr.png" 
+                          src="/images/qr.jpeg" 
                           alt="UPI QR Code for Eco Vigyan Foundation" 
                           className="w-64 h-64 object-contain"
                         />
