@@ -9,6 +9,7 @@ import { extractExifData } from "@/lib/exifUtils";
 import { uploadToCloudinary } from "@/lib/uploadToCloudinary";
 
 import { geocodeCity } from "@/lib/geocoding";
+import { useAuth } from "@/context/AuthContext";
 import {
   ECOLOGICAL_ROLES,
   TEXTURES,
@@ -25,6 +26,8 @@ export default function MushroomSubmissionForm({
   selectedLocation,
   onLocationSelect,
 }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -267,11 +270,15 @@ export default function MushroomSubmissionForm({
     }
 
     // Create preview URL (separate from EXIF extraction)
-    const previewReader = new FileReader();
-    previewReader.onloadend = () => {
-      setImagePreview(previewReader.result);
+    const showPreview = () => {
+      const previewReader = new FileReader();
+      previewReader.onloadend = () => {
+        setImagePreview(previewReader.result);
+      };
+      previewReader.readAsDataURL(file);
     };
-    previewReader.readAsDataURL(file);
+
+    if (isCamera) showPreview();
 
     // Extract EXIF data - read as ArrayBuffer to preserve all binary data
     try {
@@ -332,37 +339,26 @@ export default function MushroomSubmissionForm({
         }
         // If no EXIF date/time, device date/time was already set above
       } else {
-        // Gallery photo: Try to use EXIF, otherwise allow manual selection
-        const isLikelyStripped = !gps && !dateTime && file.size > 0;
-        
-        if (gps && gps.latitude && gps.longitude) {
-          onLocationSelect?.(gps);
-          setHasExifGps(true);
-          setLocationInputMethod("map");
-          toast.success(`Location found in EXIF: ${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`);
-        } else {
-          // No GPS in EXIF, allow manual selection
-          setHasExifGps(false);
-          setLocationInputMethod("map");
-          
-          if (isLikelyStripped) {
-            toast("EXIF data not found. Some mobile browsers/galleries strip EXIF data for privacy. Please select location manually.", {
-              icon: "ℹ️",
-              duration: 5000,
-            });
-          } else {
-            toast("No GPS data found in image. Please select location manually.", {
-              icon: "ℹ️",
-            });
-          }
+        // Gallery photo: EXIF GPS is mandatory — stripped photos are rejected
+        if (!gps || !gps.latitude || !gps.longitude) {
+          toast.error("EXIF data has been removed. Please capture a live photo.", {
+            duration: 5000,
+          });
+          setImageFile(null);
+          setIsFromCamera(false);
+          inputElement.value = "";
+          return;
         }
 
-        // Set date/time if found
+        onLocationSelect?.(gps);
+        setHasExifGps(true);
+        setLocationInputMethod("map");
+        toast.success(`Location found in EXIF: ${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`);
+        showPreview();
+
         if (dateTime) {
           setExifDateTime(dateTime);
           toast.success(`Photo date/time: ${dateTime.toLocaleString()}`);
-        } else if (isLikelyStripped) {
-          console.warn("Date/time also missing - image may have been processed by mobile browser/gallery");
         }
       }
     } catch (error) {
@@ -370,7 +366,14 @@ export default function MushroomSubmissionForm({
       console.error("Error details:", error.message, error.stack);
       setHasExifGps(false);
       setLocationInputMethod("map");
-      toast.error("Could not read EXIF data from image");
+      if (isCamera) {
+        toast.error("Could not read EXIF data from image");
+      } else {
+        toast.error("EXIF data has been removed. Please capture a live photo.");
+        setImageFile(null);
+        setIsFromCamera(false);
+        inputElement.value = "";
+      }
     } finally {
       setIsExtractingExif(false);
     }
@@ -568,9 +571,11 @@ toast.success(data.message || "Mushroom submitted successfully!");
             <p className="text-[10px] sm:text-xs font-bold text-emerald-800 text-center leading-relaxed">
               📸 <strong>Tip:</strong> Use "Take Photo with Camera" to automatically capture GPS location and date/time from your device.
             </p>
-            <p className="text-[9px] sm:text-[10px] text-emerald-700 text-center leading-relaxed">
-              ⚠️ <strong>Note:</strong> When selecting from gallery, some mobile browsers/galleries may strip EXIF data (GPS, date/time) for privacy reasons. If EXIF is missing, you can select location manually.
-            </p>
+            {isAdmin && (
+              <p className="text-[9px] sm:text-[10px] text-emerald-700 text-center leading-relaxed">
+                ⚠️ <strong>Note:</strong> Gallery uploads must still contain EXIF GPS data. Photos with EXIF stripped will be rejected.
+              </p>
+            )}
           </div>
 
           {/* PHOTO UPLOAD - REQUIRED */}
@@ -621,6 +626,7 @@ toast.success(data.message || "Mushroom submitted successfully!");
                     className="hidden"
                     onChange={handleImageChange}
                     accept="image/*"
+                    {...(isAdmin ? {} : { capture: "environment" })}
                   />
                 </label>
               </div>
@@ -648,7 +654,8 @@ toast.success(data.message || "Mushroom submitted successfully!");
                   />
                 </label>
 
-                {/* MANUAL UPLOAD OPTION */}
+                {/* MANUAL UPLOAD OPTION - ADMIN ONLY */}
+                {isAdmin && (
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-stone-300 rounded-2xl cursor-pointer hover:bg-stone-50 group transition-all bg-stone-50 relative">
                   <div className="bg-stone-400 p-3 rounded-full shadow-sm group-hover:scale-110 transition-transform">
                     <MapPin className="text-white" size={24} />
@@ -667,6 +674,7 @@ toast.success(data.message || "Mushroom submitted successfully!");
                     required
                   />
                 </label>
+                )}
               </div>
             )}
 
@@ -955,18 +963,20 @@ toast.success(data.message || "Mushroom submitted successfully!");
                       <Search size={12} className="inline mr-1" />
                       City
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setLocationInputMethod("manual")}
-                      className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${
-                        locationInputMethod === "manual"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                      }`}
-                    >
-                      <Navigation size={12} className="inline mr-1" />
-                      Manual
-                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setLocationInputMethod("manual")}
+                        className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${
+                          locationInputMethod === "manual"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        <Navigation size={12} className="inline mr-1" />
+                        Manual
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1008,8 +1018,8 @@ toast.success(data.message || "Mushroom submitted successfully!");
                   </div>
                 )}
 
-                {/* Manual Input */}
-                {locationInputMethod === "manual" && (
+                {/* Manual Input - ADMIN ONLY */}
+                {isAdmin && locationInputMethod === "manual" && (
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <input
