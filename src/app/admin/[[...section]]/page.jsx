@@ -36,7 +36,9 @@ import {
   Globe,
   LogOut,
   ShoppingBag,
-  ClipboardList
+  ClipboardList,
+  Menu,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ReviewObservationModal } from '@/components/ReviewObservationModal';
@@ -55,6 +57,7 @@ export default function AdminPanel() {
   
   // Navigation Section State (sidebar option)
   const [activeSection, setActiveSection] = useState(currentSection);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Observations State
   const [observationFilter, setObservationFilter] = useState('all');
@@ -142,6 +145,7 @@ export default function AdminPanel() {
     setActiveSection(section);
     setCurrentPage(1);
     setUsersPage(1);
+    setSidebarOpen(false);
     router.push(section === 'overview' ? '/admin' : `/admin/${section}`);
   };
 
@@ -849,23 +853,63 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row h-screen overflow-hidden">
-      
+    <div className="bg-gray-50 flex flex-col md:flex-row h-[100dvh] overflow-hidden">
+
+      {/* MOBILE TOP BAR */}
+      <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-emerald-950 text-white shrink-0 shadow-lg">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 -ml-2 rounded-xl hover:bg-emerald-900/60 transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+        <img src="/gallery/logo4.png" alt="Foundation Logo" className="w-8 h-8 object-contain" />
+        <div className="min-w-0 flex-1">
+          <p className="font-extrabold leading-none text-sm tracking-wide truncate">ECO VIGYAN</p>
+          <p className="text-[9px] tracking-widest text-emerald-400 font-bold uppercase mt-0.5">Admin Portal</p>
+        </div>
+        {pendingCount > 0 && (
+          <span className="w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shrink-0">
+            {pendingCount}
+          </span>
+        )}
+      </div>
+
+      {/* MOBILE DRAWER BACKDROP */}
+      {sidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="w-full md:w-64 bg-emerald-950 text-white shrink-0 flex flex-col justify-between z-10 shadow-xl border-r border-emerald-900">
-        <div className="flex flex-col flex-1">
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-50 md:z-10 w-72 md:w-64 max-w-[85vw] bg-emerald-950 text-white shrink-0 flex flex-col justify-between shadow-xl border-r border-emerald-900 transition-transform duration-300 md:transition-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Sidebar Header */}
           <div className="p-6 border-b border-emerald-900/60 bg-emerald-950">
             <div className="flex items-center gap-3">
-              <img 
-                src="/gallery/logo4.png" 
-                alt="Foundation Logo" 
+              <img
+                src="/gallery/logo4.png"
+                alt="Foundation Logo"
                 className="w-10 h-10 object-contain"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-extrabold text-white leading-none text-base tracking-wide truncate">ECO VIGYAN</p>
                 <p className="text-[9px] tracking-widest text-emerald-400 font-bold uppercase mt-1">Admin Portal</p>
               </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="md:hidden p-1.5 -mr-1.5 rounded-lg hover:bg-emerald-900/60 transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -950,14 +994,14 @@ export default function AdminPanel() {
       <main className="flex-1 overflow-y-auto bg-stone-50 flex flex-col h-full">
         
         {/* Dynamic header depending on the active option */}
-        <div className="p-6 md:p-8 pb-0 shrink-0">
-          <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-gray-200 gap-4">
-            <div>
+        <div className="p-4 sm:p-6 md:p-8 pb-0 shrink-0">
+          <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 gap-4">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <Shield className="w-4 h-4 text-emerald-600" />
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">ECO VIGYAN CENTRAL COMMAND</span>
               </div>
-              <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
                 {activeSection === 'overview' && 'Console Dashboard'}
                 {activeSection === 'observations' && 'Observations Verification'}
                 {activeSection === 'users' && 'Volunteer Directory'}
@@ -973,7 +1017,7 @@ export default function AdminPanel() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 self-start md:self-auto">
+            <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
               {/* Notifications drop menu */}
               <div className="relative">
                 <button
@@ -994,7 +1038,7 @@ export default function AdminPanel() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 animate-in fade-in zoom-in duration-200"
+                      className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 z-50 animate-in fade-in zoom-in duration-200"
                     >
                       <div className="p-4 border-b border-gray-100">
                         <h3 className="font-bold text-gray-900">Notifications</h3>
@@ -1048,7 +1092,7 @@ export default function AdminPanel() {
         </div>
 
         {/* SECTION CONTENT CONTAINER */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 pt-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 pt-4 sm:pt-6">
           <AnimatePresence mode="wait">
             
             {/* SECTION: OVERVIEW */}
@@ -1303,8 +1347,8 @@ export default function AdminPanel() {
                         transition={{ delay: index * 0.05 }}
                         className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
                       >
-                        <div className="p-6">
-                          <div className="flex flex-col md:flex-row gap-6">
+                        <div className="p-4 sm:p-6">
+                          <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
                             {observationFilter === 'pending' && (
                               <input
                                 type="checkbox"
@@ -2304,8 +2348,8 @@ export default function AdminPanel() {
               </div>
 
               <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Product Title</label>
                     <input
                       type="text"
@@ -2628,7 +2672,7 @@ export default function AdminPanel() {
               )}
 
               {/* Order statuses */}
-              <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Status</label>
                   <select
