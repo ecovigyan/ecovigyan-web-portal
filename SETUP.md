@@ -235,3 +235,5 @@ If you encounter issues:
 ---
 
 **Note:** Never commit your `.env.local` file to version control. It contains sensitive credentials.
+
+
