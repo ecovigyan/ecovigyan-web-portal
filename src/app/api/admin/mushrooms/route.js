@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export async function GET(req) {
   try {
@@ -27,6 +30,91 @@ export async function GET(req) {
     
     // Check if requesting system imports
     const systemImportsOnly = searchParams.get("systemImports") === "true";
+
+    // Check if requesting the list of submitters (users) for a given status
+    const submittersOnly = searchParams.get("submitters") === "true";
+
+    if (submittersOnly) {
+      const submitterStatus = searchParams.get("status") || "pending";
+
+      if (!["pending", "approved", "rejected"].includes(submitterStatus)) {
+        return NextResponse.json(
+          { error: "Invalid status filter" },
+          { status: 400 }
+        );
+      }
+
+      const search = (searchParams.get("search") || "").trim();
+      const submitterLimit = Math.min(
+        Math.max(parseInt(searchParams.get("limit")) || 30, 1),
+        100
+      );
+
+      // Exclude the bulk-import system account from the submitter list
+      const systemUser = await User.findOne({
+        $or: [
+          { email: "system@ecovigyan.org" },
+          { username: "system" },
+          { name: "System Import" },
+        ],
+      });
+
+      const match = { status: submitterStatus };
+      if (systemUser) {
+        match.submittedBy = { $ne: systemUser._id };
+      }
+
+      const searchStage = search
+        ? [
+            {
+              $match: {
+                $or: [
+                  { "user.name": { $regex: escapeRegex(search), $options: "i" } },
+                  { "user.username": { $regex: escapeRegex(search), $options: "i" } },
+                  { "user.email": { $regex: escapeRegex(search), $options: "i" } },
+                ],
+              },
+            },
+          ]
+        : [];
+
+      const submitters = await Mushroom.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: "$submittedBy",
+            count: { $sum: 1 },
+            lastSubmittedAt: { $max: "$createdAt" },
+          },
+        },
+        {
+          $lookup: {
+            from: User.collection.name,
+            localField: "_id",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
+        ...searchStage,
+        // Most recent observation first — surfaces the freshest submissions
+        { $sort: { lastSubmittedAt: -1 } },
+        { $limit: submitterLimit },
+        {
+          $project: {
+            _id: 1,
+            count: 1,
+            lastSubmittedAt: 1,
+            name: "$user.name",
+            username: "$user.username",
+            email: "$user.email",
+            dp: "$user.dp",
+          },
+        },
+      ]);
+
+      return NextResponse.json({ submitters }, { status: 200 });
+    }
 
     if (countsOnly) {
       // Get system user ID for counting system imports
@@ -121,9 +209,17 @@ export async function GET(req) {
       ],
     });
 
+    // Optional submitter filter — scopes the listing to one user's submissions
+    const userId = searchParams.get("userId");
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+
     // Build query — "all" returns every status, specific filters scope by status
     const query = status === "all" ? {} : { status };
-    if (systemUser) {
+    if (userId) {
+      query.submittedBy = new mongoose.Types.ObjectId(userId);
+    } else if (systemUser) {
       query.submittedBy = { $ne: systemUser._id };
     }
 
