@@ -10,8 +10,6 @@ npm run build    # Production build
 npm run start    # Run production server
 ```
 
-No test runner or linter is configured.
-
 ## Environment
 
 Copy `.env` variables needed locally:
