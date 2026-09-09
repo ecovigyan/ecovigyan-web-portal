@@ -66,29 +66,9 @@ export async function POST(req) {
       fruitingSurface,
       stemPresence,
       commonUses,
-      captureMethod,
     } = await req.json();
 
     /* ---------- VALIDATION ---------- */
-
-    // Gallery uploads are an admin privilege. The client hides the option for
-    // everyone else, but that is cosmetic — this is the check that enforces it.
-    const isAdmin = user.role === "admin";
-
-    if (captureMethod && !["camera", "gallery"].includes(captureMethod)) {
-      return NextResponse.json(
-        { error: "Invalid captureMethod" },
-        { status: 400 }
-      );
-    }
-
-    if (captureMethod === "gallery" && !isAdmin) {
-      return NextResponse.json(
-        { error: "Gallery uploads are restricted to admins. Please capture a live photo." },
-        { status: 403 }
-      );
-    }
-
     if (!latitude || !longitude || !imageUrl || !publicId) {
       return NextResponse.json(
         { error: "Latitude, longitude and image are required" },
@@ -114,10 +94,10 @@ export async function POST(req) {
     }
 
     /* ---------- CREATE DOCUMENT ---------- */
+    const isAdmin = user.role === "admin";
     const mushroomData = {
       images: [{ url: imageUrl, publicId }],
       location: { latitude: lat, longitude: lng },
-      captureMethod: captureMethod || "unknown",
       submittedBy: user._id,
       status: isAdmin ? "approved" : "pending",
       ...(isAdmin && { approvedAt: new Date(), reviewedBy: user._id }),

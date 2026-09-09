@@ -1,9 +1,32 @@
-import { redirect } from "next/navigation";
+"use client";
 
-// The real submission flow lives on /explore, which renders MushroomSubmissionForm.
-// This route previously held a stray form posting to /api/mushrooms/create — an
-// endpoint that does not exist — via an unrestricted file input that sidestepped
-// the camera-only rule entirely. Redirect rather than 404, in case it is bookmarked.
-export default function SubmitRedirect() {
-  redirect("/explore");
+import { useState } from "react";
+
+export default function SubmitMushroom() {
+  const [image, setImage] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const body = new FormData(e.target);
+    body.append("image", image);
+
+    await fetch("/api/mushrooms/create", {
+      method: "POST",
+      body,
+    });
+
+    alert("Submitted for review");
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" placeholder="Mushroom name" />
+      <input name="category" placeholder="Category" />
+      <input name="latitude" />
+      <input name="longitude" />
+      <input type="file" onChange={(e) => setImage(e.target.files[0])} />
+      <button>Submit</button>
+    </form>
+  );
 }

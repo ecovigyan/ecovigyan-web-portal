@@ -39,7 +39,6 @@ import {
   ClipboardList,
   Menu,
   ChevronDown,
-  Camera,
   X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -886,23 +885,6 @@ export default function AdminPanel() {
     );
   };
 
-  // Shows how the submitter supplied the photo. Gallery uploads are admin-only,
-  // so a gallery badge on a non-admin's submission is worth a second look.
-  const getCaptureBadge = (captureMethod) => {
-    const config = {
-      camera: { label: 'Camera', style: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: Camera },
-      gallery: { label: 'Gallery', style: 'bg-purple-50 text-purple-700 border-purple-200', Icon: ImageIcon },
-      unknown: { label: 'Unknown', style: 'bg-gray-50 text-gray-500 border-gray-200', Icon: AlertCircle },
-    };
-    const { label, style, Icon } = config[captureMethod] || config.unknown;
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${style}`}>
-        <Icon className="w-3.5 h-3.5" />
-        {label}
-      </span>
-    );
-  };
-
   const filterBySearch = (items, query) => {
     if (!query.trim()) return items;
     const lowerQuery = query.toLowerCase();
@@ -1586,8 +1568,7 @@ export default function AdminPanel() {
                                     <p className="text-sm text-gray-505 italic mb-2">{obs.scientificName}</p>
                                   )}
                                 </div>
-                                <div className="ml-4 flex flex-wrap items-center justify-end gap-2">
-                                  {getCaptureBadge(obs.captureMethod)}
+                                <div className="ml-4">
                                   {getStatusBadge(obs.status)}
                                 </div>
                               </div>

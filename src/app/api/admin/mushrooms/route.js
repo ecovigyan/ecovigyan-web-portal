@@ -179,7 +179,7 @@ export async function GET(req) {
         .skip(skip)
         .limit(limit)
         .select(
-          "commonName images location status captureMethod submittedBy createdAt"
+          "commonName images location status submittedBy createdAt"
         );
 
       return NextResponse.json({ 
@@ -232,7 +232,7 @@ export async function GET(req) {
       .skip(skip)
       .limit(limit)
       .select(
-        "commonName images location status captureMethod submittedBy createdAt"
+        "commonName images location status submittedBy createdAt"
       );
 
     return NextResponse.json(

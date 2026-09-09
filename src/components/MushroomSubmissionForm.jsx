@@ -232,12 +232,12 @@ export default function MushroomSubmissionForm({
     const file = e.target.files[0];
     if (!file) return;
 
-    // Which input the file came through is the only trustworthy signal here.
-    // Filename and lastModified heuristics were dropped: gallery files on Android
-    // are routinely named "image_1234.jpg" and a freshly copied file also looks
-    // recent, so both matched gallery picks as camera captures.
+    // Check if this is from camera (has capture attribute) or detect by file name/type
     const inputElement = e.target;
-    const isCamera = inputElement.hasAttribute('capture');
+    const isCamera = inputElement.hasAttribute('capture') || 
+                     file.name === '' || 
+                     file.name.startsWith('image') ||
+                     file.lastModified > Date.now() - 5000; // File created in last 5 seconds
 
     setIsFromCamera(isCamera);
     setImageFile(file);
@@ -480,7 +480,6 @@ export default function MushroomSubmissionForm({
         longitude: location.longitude,
         imageUrl: upload.secure_url,
         publicId: upload.public_id,
-        captureMethod: isFromCamera ? "camera" : "gallery",
 
         // optional
         photoDateTime: exifDateTime?.toISOString(),
