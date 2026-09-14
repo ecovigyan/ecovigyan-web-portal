@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function GET(req) {
   try {
@@ -14,7 +15,7 @@ export async function GET(req) {
     }
 
     let query = {};
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       // Regular users only see their own orders
       query.user = user._id;
     }

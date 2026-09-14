@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -17,7 +18,7 @@ export async function GET(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

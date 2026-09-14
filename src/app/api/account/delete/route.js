@@ -31,7 +31,7 @@ export async function DELETE(req) {
     }
 
     // Admins cannot self-delete to prevent accidental lockout
-    if (user.role === "admin") {
+    if (hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Admin accounts cannot be self-deleted. Contact a super-admin." },
         { status: 403 }

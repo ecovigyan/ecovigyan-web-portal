@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Trail from "@/models/Trail";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // GET - Get all trails
 export async function GET(req) {
@@ -16,7 +17,7 @@ export async function GET(req) {
 
     let trails;
     
-    if (user.role === "admin") {
+    if (hasAdminAccess(user)) {
       trails = await Trail.find()
         .populate("user", "name username")
         .sort({ createdAt: -1 })
@@ -51,7 +52,7 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only admins can create trails" },
         { status: 403 }

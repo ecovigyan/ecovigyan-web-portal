@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { isSuperAdmin } from "@/lib/permissions";
 import { X, Camera, MapPin, Search, Navigation } from "lucide-react";
 import toast from "react-hot-toast";
 import MushroomSelectField from "./MushroomSelectField";
@@ -27,7 +28,11 @@ export default function MushroomSubmissionForm({
   onLocationSelect,
 }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  // These gate submission privileges — gallery upload and manual location
+  // entry — which bypass the live-capture rule, so they are superadmin only.
+  // A subadmin moderates submissions but submits under the same rules as
+  // everyone else.
+  const isAdmin = isSuperAdmin(user);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

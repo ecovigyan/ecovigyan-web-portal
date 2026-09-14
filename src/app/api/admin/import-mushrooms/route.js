@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // Helper function to convert Google Drive sharing link to direct image URL
 function convertGoogleDriveLink(driveLink) {
@@ -55,7 +56,7 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    if (!hasAdminAccess(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

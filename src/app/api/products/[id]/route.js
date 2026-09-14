@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Product from "@/models/Product";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function GET(req, { params }) {
   try {
@@ -30,7 +31,7 @@ export async function PUT(req, { params }) {
 
     // Check admin authentication
     const { user } = await getAuthenticatedUser();
-    if (!user || user.role !== "admin") {
+    if (!user || !hasAdminAccess(user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -72,7 +73,7 @@ export async function DELETE(req, { params }) {
 
     // Check admin authentication
     const { user } = await getAuthenticatedUser();
-    if (!user || user.role !== "admin") {
+    if (!user || !hasAdminAccess(user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

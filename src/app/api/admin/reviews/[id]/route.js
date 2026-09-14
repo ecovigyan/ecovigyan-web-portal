@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Review from "@/models/Review";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { recalculateProductRating } from "@/lib/reviewStats";
+import { hasAdminAccess, isSuperAdmin } from "@/lib/permissions";
 
 /* ================= APPROVE / REJECT ================= */
 
@@ -16,7 +17,7 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    if (!hasAdminAccess(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -82,7 +83,8 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    // Deleting destroys the record — superadmin only. Subadmins reject instead.
+    if (!isSuperAdmin(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
