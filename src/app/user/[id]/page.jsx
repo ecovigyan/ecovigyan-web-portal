@@ -17,6 +17,7 @@ import {
 import toast from "react-hot-toast";
 import MushroomBadge from "@/components/MushroomBadge";
 import { useAuth } from "@/context/AuthContext";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export default function UserProfilePage() {
   const params = useParams();
@@ -114,7 +115,7 @@ export default function UserProfilePage() {
                     </p>
                     {user.role && user.role !== 'user' && (
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide ${
-                        user.role === 'admin' 
+                        hasAdminAccess(user) 
                           ? 'bg-red-100 text-red-700' 
                           : user.role === 'writer'
                           ? 'bg-blue-100 text-blue-700'

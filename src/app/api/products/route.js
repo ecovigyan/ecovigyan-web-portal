@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Product from "@/models/Product";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function GET(req) {
   try {
@@ -18,7 +19,7 @@ export async function GET(req) {
     if (adminMode) {
       // For admin mode, check if authenticated user is admin
       const { user } = await getAuthenticatedUser();
-      if (!user || user.role !== "admin") {
+      if (!user || !hasAdminAccess(user)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     } else {
@@ -54,7 +55,7 @@ export async function POST(req) {
 
     // Check admin authentication
     const { user } = await getAuthenticatedUser();
-    if (!user || user.role !== "admin") {
+    if (!user || !hasAdminAccess(user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

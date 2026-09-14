@@ -23,6 +23,8 @@ import {
   Upload
 } from "lucide-react";
 import toast from "react-hot-toast";
+import StarRating from "@/components/StarRating";
+import ProductReviews from "@/components/ProductReviews";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -301,7 +303,20 @@ export default function ProductDetailPage() {
                 <h1 className="text-3xl md:text-4xl font-extrabold font-serif text-emerald-950 tracking-tight leading-tight mb-3">
                   {product.name}
                 </h1>
-                
+
+                {/* Rating summary — only once an approved review exists */}
+                {product.reviewCount > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <StarRating value={product.averageRating || 0} size="sm" />
+                    <span className="text-sm font-bold text-emerald-900">
+                      {(product.averageRating || 0).toFixed(1)}
+                    </span>
+                    <span className="text-xs font-medium text-emerald-600/70">
+                      ({product.reviewCount} review{product.reviewCount === 1 ? "" : "s"})
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-baseline gap-4 mt-2">
                   <span className="text-4xl font-black text-emerald-950">
                     ₹{product.price}
@@ -419,6 +434,13 @@ export default function ProductDetailPage() {
           </div>
 
         </div>
+
+        {/* CUSTOMER REVIEWS */}
+        <ProductReviews
+          productId={product._id}
+          averageRating={product.averageRating || 0}
+          reviewCount={product.reviewCount || 0}
+        />
 
       </div>
 

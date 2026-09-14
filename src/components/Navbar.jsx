@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { AuthModal } from './AuthModal';
 import { usePathname } from 'next/navigation';
+import { hasAdminAccess } from "@/lib/permissions";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -114,7 +115,7 @@ export default function Navbar() {
                           </span>
                         </div>
                         <div className="p-2">
-                          {user?.role === 'admin' && (
+                          {hasAdminAccess(user) && (
                             <Link
                               href="/admin"
                               className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-50 rounded-xl transition-colors text-emerald-700 font-bold border-b border-emerald-50"
@@ -232,7 +233,7 @@ export default function Navbar() {
                       <Settings className="w-5 h-5" />
                       Profile Settings
                     </Link>
-                    {user?.role === 'admin' && (
+                    {hasAdminAccess(user) && (
                       <Link
                         href="/admin"
                         className="flex items-center gap-3 px-3 py-3 text-base font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg"
