@@ -60,6 +60,22 @@ const ProductSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+
+    /* ---------------- RATINGS ---------------- */
+    // Denormalised from approved reviews so listing pages do not need to
+    // aggregate. Kept in sync by recalculateProductRating() — never set these
+    // by hand.
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    reviewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

@@ -40,6 +40,7 @@ import {
   Menu,
   ChevronDown,
   Camera,
+  Star,
   X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -48,7 +49,7 @@ import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { ImportExcelModal } from '@/components/ImportExcelModal';
 
-const VALID_SECTIONS = new Set(['overview', 'observations', 'users', 'products', 'orders']);
+const VALID_SECTIONS = new Set(['overview', 'observations', 'users', 'products', 'orders', 'reviews']);
 
 export default function AdminPanel() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -126,6 +127,13 @@ export default function AdminPanel() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersSearch, setOrdersSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  /* ---------------- PRODUCT REVIEWS ---------------- */
+  const [reviewsList, setReviewsList] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewFilter, setReviewFilter] = useState('pending');
+  const [reviewCounts, setReviewCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
+  const [reviewActionId, setReviewActionId] = useState(null);
 
   // Stats State
   const [stats, setStats] = useState({
@@ -234,6 +242,20 @@ export default function AdminPanel() {
       loadOrders();
     }
   }, [user, activeSection, ordersSearch]);
+
+  // Load product reviews
+  useEffect(() => {
+    if (user?.role === 'admin' && activeSection === 'reviews') {
+      loadReviews();
+    }
+  }, [user, activeSection, reviewFilter]);
+
+  // Review counts drive the sidebar badge, so they load regardless of section
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchReviewCounts();
+    }
+  }, [user]);
 
   // Initial load of counts/stats
   useEffect(() => {
@@ -866,6 +888,79 @@ export default function AdminPanel() {
     }
   };
 
+  const fetchReviewCounts = async () => {
+    try {
+      const res = await fetch('/api/admin/reviews?countsOnly=true');
+      const data = await res.json();
+      if (res.ok) setReviewCounts(data.counts || { pending: 0, approved: 0, rejected: 0 });
+    } catch (error) {
+      console.error('Fetch review counts error:', error);
+    }
+  };
+
+  const loadReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      const res = await fetch(`/api/admin/reviews?status=${reviewFilter}`);
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Failed to load reviews');
+
+      setReviewsList(data.reviews || []);
+      await fetchReviewCounts();
+    } catch (error) {
+      console.error('Load reviews error:', error);
+      toast.error(error.message || 'Failed to load reviews');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const updateReviewStatus = async (id, status) => {
+    // Rejections carry an optional reason, shown back to the review author
+    let rejectionReason;
+    if (status === 'rejected') {
+      rejectionReason = window.prompt('Reason for rejecting this review (optional):') || undefined;
+    }
+
+    try {
+      setReviewActionId(id);
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, rejectionReason }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update review');
+
+      toast.success(data.message || `Review ${status}`);
+      await loadReviews();
+    } catch (error) {
+      toast.error(error.message || 'Failed to update review');
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
+  const deleteReview = async (id) => {
+    if (!window.confirm('Delete this review permanently? This cannot be undone.')) return;
+
+    try {
+      setReviewActionId(id);
+      const res = await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete review');
+
+      toast.success('Review deleted');
+      await loadReviews();
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete review');
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -938,7 +1033,8 @@ export default function AdminPanel() {
     { id: 'observations', label: 'Observations Review', icon: MapPin, badge: stats.pendingObservations },
     { id: 'users', label: 'Volunteer Directory', icon: Users },
     { id: 'products', label: 'Products Directory', icon: ShoppingBag },
-    { id: 'orders', label: 'Orders Registry', icon: ClipboardList }
+    { id: 'orders', label: 'Orders Registry', icon: ClipboardList },
+    { id: 'reviews', label: 'Product Reviews', icon: Star, badge: reviewCounts.pending }
   ];
 
   return (
@@ -1096,6 +1192,7 @@ export default function AdminPanel() {
                 {activeSection === 'users' && 'Volunteer Directory'}
                 {activeSection === 'products' && 'Products Inventory'}
                 {activeSection === 'orders' && 'Orders Registry'}
+                {activeSection === 'reviews' && 'Product Reviews'}
               </h1>
               <p className="text-sm text-gray-500 mt-1 font-medium">
                 {activeSection === 'overview' && 'Platform status overview, task summary and direct quick links'}
@@ -1103,6 +1200,7 @@ export default function AdminPanel() {
                 {activeSection === 'users' && 'Manage system users, view accumulated leaderboard points and ban status'}
                 {activeSection === 'products' && 'Manage e-commerce products: add, edit, or delete items and edit specifications'}
                 {activeSection === 'orders' && 'Track orders, verify shipping details, update status, and manage payment states'}
+                {activeSection === 'reviews' && 'Approve or reject customer product reviews before they appear publicly'}
               </p>
             </div>
 
@@ -2244,6 +2342,150 @@ export default function AdminPanel() {
                     </div>
                   )}
                 </div>
+              </motion.div>
+            )}
+
+            {/* ================= PRODUCT REVIEWS ================= */}
+            {activeSection === 'reviews' && (
+              <motion.div
+                key="reviews"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="space-y-6"
+              >
+                {/* Status tabs */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: 'Pending', value: reviewCounts.pending, key: 'pending', color: 'bg-amber-500' },
+                    { label: 'Approved', value: reviewCounts.approved, key: 'approved', color: 'bg-emerald-500' },
+                    { label: 'Rejected', value: reviewCounts.rejected, key: 'rejected', color: 'bg-red-500' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setReviewFilter(tab.key)}
+                      className={`p-4 rounded-2xl border-2 transition-all text-left ${
+                        reviewFilter === tab.key
+                          ? 'bg-white border-emerald-500 shadow-md'
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className={`w-10 h-10 rounded-lg ${tab.color} flex items-center justify-center`}>
+                          <Star className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-2xl font-bold text-gray-900">{tab.value}</span>
+                      </div>
+                      <div className="text-sm font-semibold text-gray-505">{tab.label}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Review list */}
+                {reviewsLoading ? (
+                  <div className="bg-white rounded-2xl p-12 text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                    <p className="text-gray-505">Loading reviews...</p>
+                  </div>
+                ) : reviewsList.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+                    <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-505 font-semibold">No {reviewFilter} reviews</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviewsList.map((review) => (
+                      <div
+                        key={review._id}
+                        className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+                      >
+                        <div className="flex flex-col md:flex-row gap-5">
+                          {review.product?.image && (
+                            <img
+                              src={review.product.image}
+                              alt={review.product?.name || 'Product'}
+                              className="w-20 h-20 rounded-xl object-cover border border-gray-200 shrink-0"
+                            />
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <div className="min-w-0">
+                                <p className="font-bold text-gray-900 truncate">
+                                  {review.product?.name || 'Unknown product'}
+                                </p>
+                                <p className="text-xs text-gray-505">
+                                  by {review.user?.name || review.user?.username || 'Unknown'}
+                                  {review.user?.email && ` · ${review.user.email}`}
+                                </p>
+                              </div>
+                              <div className="shrink-0">{getStatusBadge(review.status)}</div>
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`w-4 h-4 ${
+                                      star <= review.rating ? 'text-amber-400' : 'text-gray-300'
+                                    }`}
+                                    fill="currentColor"
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-xs font-bold text-gray-700">{review.rating}/5</span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(review.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+
+                            {review.title && (
+                              <p className="font-bold text-gray-900 text-sm mb-1">{review.title}</p>
+                            )}
+                            {review.comment && (
+                              <p className="text-sm text-gray-700 leading-relaxed">{review.comment}</p>
+                            )}
+                            {review.status === 'rejected' && review.rejectionReason && (
+                              <p className="text-xs text-red-600 mt-2">
+                                <span className="font-bold">Rejection reason:</span> {review.rejectionReason}
+                              </p>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap gap-2 mt-4">
+                              {review.status !== 'approved' && (
+                                <button
+                                  onClick={() => updateReviewStatus(review._id, 'approved')}
+                                  disabled={reviewActionId === review._id}
+                                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-all disabled:opacity-50"
+                                >
+                                  {reviewActionId === review._id ? 'Working...' : 'Approve'}
+                                </button>
+                              )}
+                              {review.status !== 'rejected' && (
+                                <button
+                                  onClick={() => updateReviewStatus(review._id, 'rejected')}
+                                  disabled={reviewActionId === review._id}
+                                  className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 transition-all disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteReview(review._id)}
+                                disabled={reviewActionId === review._id}
+                                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
 
