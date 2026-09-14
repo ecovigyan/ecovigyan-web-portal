@@ -232,12 +232,12 @@ export default function MushroomSubmissionForm({
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check if this is from camera (has capture attribute) or detect by file name/type
+    // Which input the file came through is the only trustworthy signal here.
+    // Filename and lastModified heuristics were dropped: gallery files on Android
+    // are routinely named "image_1234.jpg" and a freshly copied file also looks
+    // recent, so both matched gallery picks as camera captures.
     const inputElement = e.target;
-    const isCamera = inputElement.hasAttribute('capture') || 
-                     file.name === '' || 
-                     file.name.startsWith('image') ||
-                     file.lastModified > Date.now() - 5000; // File created in last 5 seconds
+    const isCamera = inputElement.hasAttribute('capture');
 
     setIsFromCamera(isCamera);
     setImageFile(file);
@@ -480,6 +480,7 @@ export default function MushroomSubmissionForm({
         longitude: location.longitude,
         imageUrl: upload.secure_url,
         publicId: upload.public_id,
+        captureMethod: isFromCamera ? "camera" : "gallery",
 
         // optional
         photoDateTime: exifDateTime?.toISOString(),
@@ -917,7 +918,9 @@ toast.success(data.message || "Mushroom submitted successfully!");
                       </p>
                     )}
                   </div>
-                  {hasExifGps && (
+                  {/* Admin only: discarding the EXIF location leaves a non-admin
+                      with no picker and no way back to the coordinates they had. */}
+                  {hasExifGps && isAdmin && (
                     <button
                       type="button"
                       onClick={() => {
@@ -933,8 +936,12 @@ toast.success(data.message || "Mushroom submitted successfully!");
               </div>
             )}
 
-            {/* Location Input Methods - Only show if EXIF GPS is not present */}
-            {!hasExifGps && (
+            {/* Location Input Methods - ADMIN ONLY, and only when the photo
+                carries no EXIF GPS. Regular submitters cannot set a location by
+                hand at all: the coordinates must come from the photo itself, so
+                an observation's location always reflects where the photo was
+                actually taken. */}
+            {!hasExifGps && isAdmin && (
               <div className="space-y-3">
                 {/* Method Selector */}
                 {!currentLocation && (
@@ -1048,6 +1055,20 @@ toast.success(data.message || "Mushroom submitted successfully!");
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Non-admins have no manual fallback — tell them why and how to fix it */}
+            {!hasExifGps && !isAdmin && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1">
+                <p className="text-xs font-bold text-amber-800">
+                  No location found in this photo
+                </p>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  Observation locations come from the photo itself. Turn on location
+                  access for your camera and take the photo again — a photo picked from
+                  your gallery or one with its location data removed cannot be submitted.
+                </p>
               </div>
             )}
           </div>

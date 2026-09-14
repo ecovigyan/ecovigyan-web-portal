@@ -106,6 +106,17 @@ const MushroomSchema = new mongoose.Schema(
       maxlength: 2000,
     },
 
+    /* ================= PROVENANCE ================= */
+
+    // How the submitter supplied the photo. Gallery uploads are admin-only —
+    // enforced in POST /api/mushrooms, not just hidden in the UI.
+    // "unknown" covers records created before this field existed.
+    captureMethod: {
+      type: String,
+      enum: ["camera", "gallery", "unknown"],
+      default: "unknown",
+    },
+
     /* ================= MODERATION ================= */
 
     status: {
