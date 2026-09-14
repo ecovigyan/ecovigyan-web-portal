@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { X, Camera, MapPin, Search, Navigation } from "lucide-react";
 import toast from "react-hot-toast";
 import MushroomSelectField from "./MushroomSelectField";
@@ -85,75 +85,91 @@ export default function MushroomSubmissionForm({
     }
   }, [isOpen]);
 
+  // Canonical (common name, scientific name) pairs drawn from existing
+  // observations.
+  //
+  // Both suggestion lists used to dedupe on a single field — the common-name
+  // list keyed only on commonName, the scientific list only on scientificName
+  // — and each attached whichever partner name happened to come first in the
+  // API response. Records sort by approvedAt, so a submission saved without a
+  // scientific name could shadow a complete one, and the same mushroom showed
+  // a different partner name depending on which field you searched from.
+  // Keying on the pair means both lists describe the same set of mushrooms.
+  const namePairs = useMemo(() => {
+    const byPair = new Map();
+
+    allMushrooms.forEach((item) => {
+      const common = (item.commonName || item.name || "").trim();
+      const scientific = (item.scientificName || "").trim();
+
+      // An observation with neither name tells us nothing
+      if (!common && !scientific) return;
+
+      const key = `${common.toLowerCase()}|${scientific.toLowerCase()}`;
+      if (byPair.has(key)) return;
+
+      byPair.set(key, {
+        commonName: common,
+        scientificName: scientific,
+        ecologicalRole: item.ecologicalRole || [],
+        texture: item.texture || "",
+        underside: item.underside || "",
+        fruitingSurface: item.fruitingSurface || "",
+        stemPresence: item.stemPresence || "",
+        commonUses: item.commonUses || [],
+      });
+    });
+
+    const pairs = Array.from(byPair.values());
+
+    // Where a complete pair exists, drop the half-filled entries that carry
+    // the same name. Otherwise picking "Oyster Mushroom" could fill in a blank
+    // scientific name purely because that record was submitted more recently.
+    const complete = pairs.filter((pair) => pair.commonName && pair.scientificName);
+    const commonCovered = new Set(complete.map((pair) => pair.commonName.toLowerCase()));
+    const scientificCovered = new Set(complete.map((pair) => pair.scientificName.toLowerCase()));
+
+    return pairs.filter((pair) => {
+      if (pair.commonName && pair.scientificName) return true;
+      if (pair.commonName && commonCovered.has(pair.commonName.toLowerCase())) return false;
+      if (pair.scientificName && scientificCovered.has(pair.scientificName.toLowerCase())) return false;
+      return true;
+    });
+  }, [allMushrooms]);
+
   // Generate common name suggestions
   useEffect(() => {
-    if (!commonName.trim() || !allMushrooms.length) {
+    const query = commonName.toLowerCase().trim();
+
+    if (!query || !namePairs.length) {
       setCommonNameSuggestions([]);
       setShowCommonNameSuggestions(false);
       return;
     }
 
-    const searchLower = commonName.toLowerCase().trim();
-    const uniqueMatches = new Map();
-
-    allMushrooms.forEach((item) => {
-      const itemCommonName = (item.commonName || item.name || "").toLowerCase();
-      
-      if (itemCommonName.includes(searchLower)) {
-        const key = item.commonName || item.name;
-        if (!uniqueMatches.has(key)) {
-          uniqueMatches.set(key, {
-            commonName: item.commonName || item.name || "Unknown",
-            scientificName: item.scientificName || "",
-            ecologicalRole: item.ecologicalRole || [],
-            texture: item.texture || "",
-            underside: item.underside || "",
-            fruitingSurface: item.fruitingSurface || "",
-            stemPresence: item.stemPresence || "",
-            commonUses: item.commonUses || [],
-          });
-        }
-      }
-    });
-
-    const matchArray = Array.from(uniqueMatches.values()).slice(0, 8);
-    setCommonNameSuggestions(matchArray);
-  }, [commonName, allMushrooms]);
+    setCommonNameSuggestions(
+      namePairs
+        .filter((pair) => pair.commonName.toLowerCase().includes(query))
+        .slice(0, 8)
+    );
+  }, [commonName, namePairs]);
 
   // Generate scientific name suggestions
   useEffect(() => {
-    if (!scientificName.trim() || !allMushrooms.length) {
+    const query = scientificName.toLowerCase().trim();
+
+    if (!query || !namePairs.length) {
       setScientificNameSuggestions([]);
       setShowScientificNameSuggestions(false);
       return;
     }
 
-    const searchLower = scientificName.toLowerCase().trim();
-    const uniqueMatches = new Map();
-
-    allMushrooms.forEach((item) => {
-      const itemScientificName = (item.scientificName || "").toLowerCase();
-      
-      if (itemScientificName.includes(searchLower)) {
-        const key = item.scientificName;
-        if (key && !uniqueMatches.has(key)) {
-          uniqueMatches.set(key, {
-            commonName: item.commonName || item.name || "Unknown",
-            scientificName: item.scientificName,
-            ecologicalRole: item.ecologicalRole || [],
-            texture: item.texture || "",
-            underside: item.underside || "",
-            fruitingSurface: item.fruitingSurface || "",
-            stemPresence: item.stemPresence || "",
-            commonUses: item.commonUses || [],
-          });
-        }
-      }
-    });
-
-    const matchArray = Array.from(uniqueMatches.values()).slice(0, 8);
-    setScientificNameSuggestions(matchArray);
-  }, [scientificName, allMushrooms]);
+    setScientificNameSuggestions(
+      namePairs
+        .filter((pair) => pair.scientificName.toLowerCase().includes(query))
+        .slice(0, 8)
+    );
+  }, [scientificName, namePairs]);
 
   // Handle click outside for common name
   useEffect(() => {
