@@ -4,6 +4,7 @@ import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import cloudinary from "@/lib/cloudinary";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/permissions";
 
 export async function DELETE(req, { params }) {
   try {
@@ -28,9 +29,11 @@ export async function DELETE(req, { params }) {
 
     /* ================= AUTHORIZATION ================= */
     const isOwner = mushroom.submittedBy.toString() === user._id.toString();
-    const isAdmin = user.role === "admin";
+    // Deleting someone else's observation is superadmin only — subadmins
+    // moderate by rejecting rather than destroying the record.
+    const canDeleteAny = isSuperAdmin(user);
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !canDeleteAny) {
       return NextResponse.json(
         { error: "Forbidden: You can only delete your own submissions" },
         { status: 403 }

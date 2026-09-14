@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -17,7 +18,7 @@ export async function GET(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -37,7 +38,7 @@ export async function GET(req) {
     if (submittersOnly) {
       const submitterStatus = searchParams.get("status") || "pending";
 
-      if (!["pending", "approved", "rejected"].includes(submitterStatus)) {
+      if (!["all", "pending", "approved", "rejected"].includes(submitterStatus)) {
         return NextResponse.json(
           { error: "Invalid status filter" },
           { status: 400 }
@@ -59,7 +60,8 @@ export async function GET(req) {
         ],
       });
 
-      const match = { status: submitterStatus };
+      // "all" counts every status for each submitter, matching the All tab
+      const match = submitterStatus === "all" ? {} : { status: submitterStatus };
       if (systemUser) {
         match.submittedBy = { $ne: systemUser._id };
       }

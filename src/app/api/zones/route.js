@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Zone from "@/models/Zone";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // GET - Get all zones (filtered by category if provided)
 export async function GET(req) {
@@ -46,7 +47,7 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only admins can create zones" },
         { status: 403 }

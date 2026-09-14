@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import Zone from "@/models/Zone";
 import mongoose from "mongoose";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // GET - Get a specific zone
 export async function GET(req, { params }) {
@@ -51,7 +52,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only admins can delete zones" },
         { status: 403 }

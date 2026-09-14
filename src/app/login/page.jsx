@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, Lock, ArrowRight, Leaf } from "lucide-react";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      if (user.role === "admin") {
+      if (hasAdminAccess(user)) {
         router.push("/admin");
       } else {
         router.push("/explore");

@@ -6,6 +6,7 @@ import { X, Mail, Lock, User, LogIn, UserPlus, AlertCircle, CheckCircle, KeyRoun
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { hasAdminAccess } from "@/lib/permissions";
 
 export function AuthModal({ isOpen, onClose, defaultMode = 'login', resetToken: initialResetToken = '' }) {
   const [mode, setMode] = useState(defaultMode);
@@ -58,7 +59,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login', resetToken: 
           try {
             const userRes = await fetch('/api/auth/current-user');
             const userData = await userRes.json();
-            if (userData?.user?.role === 'admin') {
+            if (hasAdminAccess(userData.user)) {
               router.push('/admin');
             } else {
               router.refresh();

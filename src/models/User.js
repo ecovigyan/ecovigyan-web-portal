@@ -55,9 +55,13 @@ const userSchema = new mongoose.Schema(
     },
 
     /* ---------------- ROLE SYSTEM ---------------- */
+    // "admin" is retained as a legacy value only — it predates the
+    // subadmin/superadmin split and is treated as superadmin by
+    // lib/permissions.js so existing accounts keep working. New accounts
+    // should be given "subadmin" or "superadmin".
     role: {
       type: String,
-      enum: ["user", "writer", "admin"],
+      enum: ["user", "writer", "subadmin", "superadmin", "admin"],
       default: "user",
     },
 

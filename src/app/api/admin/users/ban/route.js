@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess, isSuperAdmin } from "@/lib/permissions";
 
 // Ban/Unban a user (admin only)
 export async function POST(req) {
@@ -14,7 +15,8 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    // Banning is a trust operation — superadmin only
+    if (!isSuperAdmin(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -54,8 +56,8 @@ export async function POST(req) {
       );
     }
 
-    // Prevent banning other admins
-    if (user.role === "admin") {
+    // Prevent banning any admin-tier account, subadmins included
+    if (hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Cannot ban another admin" },
         { status: 403 }

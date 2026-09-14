@@ -2,6 +2,7 @@ import { connectDB } from "@/lib/mongodb";
 import Gallery from "@/models/Gallery";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function POST(req) {
   try {
@@ -12,7 +13,7 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "writer" && user.role !== "admin") {
+    if (user.role !== "writer" && !hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only writers and admins can upload gallery images" },
         { status: 403 }

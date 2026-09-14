@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Mushroom from "@/models/Mushroom";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess, isSuperAdmin } from "@/lib/permissions";
 
 
 export async function GET(req) {
@@ -71,9 +72,11 @@ export async function POST(req) {
 
     /* ---------- VALIDATION ---------- */
 
-    // Gallery uploads are an admin privilege. The client hides the option for
-    // everyone else, but that is cosmetic — this is the check that enforces it.
-    const isAdmin = user.role === "admin";
+    // Two different privileges, deliberately split:
+    //  - gallery upload bypasses the live-capture rule, so superadmin only
+    //  - auto-approving your own submission is moderation, so either tier
+    const canUploadFromGallery = isSuperAdmin(user);
+    const isAdmin = hasAdminAccess(user);
 
     if (captureMethod && !["camera", "gallery"].includes(captureMethod)) {
       return NextResponse.json(
@@ -82,9 +85,9 @@ export async function POST(req) {
       );
     }
 
-    if (captureMethod === "gallery" && !isAdmin) {
+    if (captureMethod === "gallery" && !canUploadFromGallery) {
       return NextResponse.json(
-        { error: "Gallery uploads are restricted to admins. Please capture a live photo." },
+        { error: "Gallery uploads are restricted to super admins. Please capture a live photo." },
         { status: 403 }
       );
     }

@@ -5,10 +5,11 @@ import { X, Square, Circle, Loader2, Hexagon, FolderOpen, Trash2 } from "lucide-
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export default function ZoneModal({ isOpen, onClose, onZoneSelect, onDrawingModeSelect }) {
   const { user } = useAuth();
-  const isAdmin = user && user.role === "admin";
+  const isAdmin = user && hasAdminAccess(user);
   const [activeTab, setActiveTab] = useState("saved"); // "draw" or "saved"
   const [savedZones, setSavedZones] = useState([]);
   const [loadingZones, setLoadingZones] = useState(false);
