@@ -187,23 +187,27 @@ export default function AdminPanel() {
     }
   }, [user, activeSection, observationFilter, currentPage, submitterFilter?._id]);
 
-  // The submitter filter only makes sense for the pending queue — drop it otherwise
+  // System imports all belong to one system account, so a submitter filter
+  // there is meaningless — drop it. Every other tab keeps the selection, so
+  // switching between Pending and Approved stays scoped to the same person.
   useEffect(() => {
-    if (observationFilter !== 'pending') {
+    if (observationFilter === 'system-imports') {
       setSubmitterFilter(null);
       setSubmitterSearch('');
       setShowSubmitterDropdown(false);
     }
   }, [observationFilter]);
 
-  // Load the list of users who currently have pending submissions (debounced search)
+  // Load the submitters for the tab in view (debounced search). Counts shown
+  // in the dropdown are scoped to that tab, so they always agree with the list
+  // behind it.
   useEffect(() => {
     if (!hasAdminAccess(user)) return;
-    if (activeSection !== 'observations' || observationFilter !== 'pending') return;
+    if (activeSection !== 'observations' || observationFilter === 'system-imports') return;
     if (!showSubmitterDropdown) return;
 
     const timer = setTimeout(() => {
-      loadSubmitters(submitterSearch);
+      loadSubmitters(submitterSearch, observationFilter);
     }, 300);
 
     return () => clearTimeout(timer);
@@ -268,16 +272,17 @@ export default function AdminPanel() {
   const loadObservations = async () => {
     try {
       setLoading(true);
-      // Submitter filter is scoped to the pending queue only
+      // The submitter filter applies to every tab except system imports,
+      // where every record belongs to the same system account anyway.
       const submitterParam =
-        observationFilter === 'pending' && submitterFilter?._id
+        observationFilter !== 'system-imports' && submitterFilter?._id
           ? `&userId=${submitterFilter._id}`
           : '';
 
       const url = observationFilter === 'system-imports'
         ? `/api/admin/mushrooms?systemImports=true&page=${currentPage}&limit=24`
         : observationFilter === 'all'
-        ? `/api/admin/mushrooms?page=${currentPage}`
+        ? `/api/admin/mushrooms?page=${currentPage}${submitterParam}`
         : `/api/admin/mushrooms?status=${observationFilter}&page=${currentPage}${submitterParam}`;
 
       const res = await fetch(url);
@@ -299,11 +304,11 @@ export default function AdminPanel() {
     }
   };
 
-  const loadSubmitters = async (search = '') => {
+  const loadSubmitters = async (search = '', status = 'pending') => {
     try {
       setSubmittersLoading(true);
       const res = await fetch(
-        `/api/admin/mushrooms?submitters=true&status=pending&search=${encodeURIComponent(search)}`
+        `/api/admin/mushrooms?submitters=true&status=${status}&search=${encodeURIComponent(search)}`
       );
       const data = await res.json();
 
@@ -1524,8 +1529,8 @@ export default function AdminPanel() {
                       />
                     </div>
 
-                    {/* Submitter filter — pending queue only */}
-                    {observationFilter === 'pending' && (
+                    {/* Submitter filter — every tab except system imports */}
+                    {observationFilter !== 'system-imports' && (
                       <div className="relative md:w-72" ref={submitterDropdownRef}>
                         <button
                           type="button"
@@ -1592,7 +1597,7 @@ export default function AdminPanel() {
                                 <div className="p-4 text-center text-sm text-gray-500">Loading users...</div>
                               ) : submitters.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-gray-500">
-                                  No users with pending observations
+                                  No users with {observationFilter === 'all' ? '' : `${observationFilter} `}observations
                                 </div>
                               ) : (
                                 submitters.map((submitter) => (
