@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { isPointInPolygon, calculateDistance } from "@/lib/geocoding";
 import { saveTrail } from "@/lib/trailStorage";
 import toast from "react-hot-toast";
+import { hasAdminAccess } from "@/lib/permissions";
 
 const Map = dynamic(() => import("@/components/Map"), { 
   ssr: false,
@@ -1089,7 +1090,7 @@ function MapPageContent() {
   // Handle drawing mode selection (admin only)
   const handleDrawingModeSelect = (mode) => {
     // Only allow admins to use drawing mode
-    if (!user || user.role !== "admin") {
+    if (!user || !hasAdminAccess(user)) {
       toast.error("Drawing zones is only available for administrators.");
       return;
     }
@@ -1482,7 +1483,7 @@ function MapPageContent() {
                   trailMushrooms={trailMushrooms}
                   trailCurrentLocation={trailCurrentLocation}
                   onTrailMushroomAdd={handleTrailMushroomAdd}
-                  onStartTrail={user?.role === "admin" ? handleStartTrailToMushroom : undefined}
+                  onStartTrail={hasAdminAccess(user) ? handleStartTrailToMushroom : undefined}
                   onMushroomClick={(mushroom) => {
                     if (trailMode) {
                       handleTrailMushroomAdd(mushroom);
@@ -1562,7 +1563,7 @@ function MapPageContent() {
                         <CheckCircle size={18} className="shrink-0" />
                         Apply Zone
                       </button>
-                      {user?.role === "admin" && (
+                      {hasAdminAccess(user) && (
                         <button
                           onClick={() => {
                             const currentZone = getCurrentBoundaryRef.current?.();
@@ -1714,7 +1715,7 @@ function MapPageContent() {
                       </p>
 
                       <div className="mt-3 flex gap-2">
-                        {user?.role === "admin" && trailMushrooms.length > 0 && (
+                        {hasAdminAccess(user) && trailMushrooms.length > 0 && (
                           <button
                             onClick={handleSaveTrail}
                             className="flex-1 px-3 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] transition-colors flex items-center justify-center gap-1.5 shadow-lg"
@@ -1800,7 +1801,7 @@ function MapPageContent() {
       {/* MOBILE FLOATING BUTTONS — trail active-state controls only */}
       {view === "map" && trailMode && (
         <div className="md:hidden fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-          {trailMushrooms.length > 0 && user?.role === "admin" && (
+          {trailMushrooms.length > 0 && hasAdminAccess(user) && (
             <button
               onClick={handleSaveTrail}
               className="px-4 py-3 rounded-2xl bg-green-600/90 hover:bg-green-700/90 text-white shadow-2xl transition-all active:scale-95 backdrop-blur-md border border-green-500 flex items-center gap-2"

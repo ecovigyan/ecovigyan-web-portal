@@ -48,6 +48,7 @@ import { ReviewObservationModal } from '@/components/ReviewObservationModal';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { ImportExcelModal } from '@/components/ImportExcelModal';
+import { hasAdminAccess, isSuperAdmin, roleLabel } from '@/lib/permissions';
 
 const VALID_SECTIONS = new Set(['overview', 'observations', 'users', 'products', 'orders', 'reviews']);
 
@@ -173,7 +174,7 @@ export default function AdminPanel() {
       router.push('/login');
       return;
     }
-    if (user.role !== 'admin') {
+    if (!hasAdminAccess(user)) {
       router.push('/dashboard');
       return;
     }
@@ -181,28 +182,32 @@ export default function AdminPanel() {
 
   // Load observations data
   useEffect(() => {
-    if (user?.role === 'admin' && activeSection === 'observations') {
+    if (hasAdminAccess(user) && activeSection === 'observations') {
       loadObservations();
     }
   }, [user, activeSection, observationFilter, currentPage, submitterFilter?._id]);
 
-  // The submitter filter only makes sense for the pending queue — drop it otherwise
+  // System imports all belong to one system account, so a submitter filter
+  // there is meaningless — drop it. Every other tab keeps the selection, so
+  // switching between Pending and Approved stays scoped to the same person.
   useEffect(() => {
-    if (observationFilter !== 'pending') {
+    if (observationFilter === 'system-imports') {
       setSubmitterFilter(null);
       setSubmitterSearch('');
       setShowSubmitterDropdown(false);
     }
   }, [observationFilter]);
 
-  // Load the list of users who currently have pending submissions (debounced search)
+  // Load the submitters for the tab in view (debounced search). Counts shown
+  // in the dropdown are scoped to that tab, so they always agree with the list
+  // behind it.
   useEffect(() => {
-    if (user?.role !== 'admin') return;
-    if (activeSection !== 'observations' || observationFilter !== 'pending') return;
+    if (!hasAdminAccess(user)) return;
+    if (activeSection !== 'observations' || observationFilter === 'system-imports') return;
     if (!showSubmitterDropdown) return;
 
     const timer = setTimeout(() => {
-      loadSubmitters(submitterSearch);
+      loadSubmitters(submitterSearch, observationFilter);
     }, 300);
 
     return () => clearTimeout(timer);
@@ -224,42 +229,42 @@ export default function AdminPanel() {
 
   // Load users data
   useEffect(() => {
-    if (user?.role === 'admin' && activeSection === 'users') {
+    if (hasAdminAccess(user) && activeSection === 'users') {
       loadUsers();
     }
   }, [user, activeSection, usersPage, usersSearch]);
 
   // Load products data
   useEffect(() => {
-    if (user?.role === 'admin' && activeSection === 'products') {
+    if (hasAdminAccess(user) && activeSection === 'products') {
       loadProducts();
     }
   }, [user, activeSection]);
 
   // Load orders data
   useEffect(() => {
-    if (user?.role === 'admin' && activeSection === 'orders') {
+    if (hasAdminAccess(user) && activeSection === 'orders') {
       loadOrders();
     }
   }, [user, activeSection, ordersSearch]);
 
   // Load product reviews
   useEffect(() => {
-    if (user?.role === 'admin' && activeSection === 'reviews') {
+    if (hasAdminAccess(user) && activeSection === 'reviews') {
       loadReviews();
     }
   }, [user, activeSection, reviewFilter]);
 
   // Review counts drive the sidebar badge, so they load regardless of section
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (hasAdminAccess(user)) {
       fetchReviewCounts();
     }
   }, [user]);
 
   // Initial load of counts/stats
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (hasAdminAccess(user)) {
       fetchCounts();
     }
   }, [user]);
@@ -267,16 +272,17 @@ export default function AdminPanel() {
   const loadObservations = async () => {
     try {
       setLoading(true);
-      // Submitter filter is scoped to the pending queue only
+      // The submitter filter applies to every tab except system imports,
+      // where every record belongs to the same system account anyway.
       const submitterParam =
-        observationFilter === 'pending' && submitterFilter?._id
+        observationFilter !== 'system-imports' && submitterFilter?._id
           ? `&userId=${submitterFilter._id}`
           : '';
 
       const url = observationFilter === 'system-imports'
         ? `/api/admin/mushrooms?systemImports=true&page=${currentPage}&limit=24`
         : observationFilter === 'all'
-        ? `/api/admin/mushrooms?page=${currentPage}`
+        ? `/api/admin/mushrooms?page=${currentPage}${submitterParam}`
         : `/api/admin/mushrooms?status=${observationFilter}&page=${currentPage}${submitterParam}`;
 
       const res = await fetch(url);
@@ -298,11 +304,11 @@ export default function AdminPanel() {
     }
   };
 
-  const loadSubmitters = async (search = '') => {
+  const loadSubmitters = async (search = '', status = 'pending') => {
     try {
       setSubmittersLoading(true);
       const res = await fetch(
-        `/api/admin/mushrooms?submitters=true&status=pending&search=${encodeURIComponent(search)}`
+        `/api/admin/mushrooms?submitters=true&status=${status}&search=${encodeURIComponent(search)}`
       );
       const data = await res.json();
 
@@ -1023,11 +1029,18 @@ export default function AdminPanel() {
   }
 
   // Double check role guard
-  if (!user || user.role !== 'admin') {
+  if (!user || !hasAdminAccess(user)) {
     return null;
   }
 
   // Sidebar Menu Items
+  // Superadmins get the destructive and trust-related controls; subadmins
+  // see the same panel with those actions hidden. The server enforces this
+  // regardless — these checks only keep buttons out of the UI that would
+  // return 403.
+  const canManageUsers = isSuperAdmin(user);
+  const canDelete = isSuperAdmin(user);
+
   const sidebarItems = [
     { id: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
     { id: 'observations', label: 'Observations Review', icon: MapPin, badge: stats.pendingObservations },
@@ -1489,12 +1502,14 @@ export default function AdminPanel() {
                               >
                                 {bulkApproving ? 'Approving...' : `Approve (${selectedItems.size})`}
                               </button>
+                              {canDelete && (
                               <button
                                 onClick={handleBulkDelete}
                                 className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all"
                               >
                                 Delete (${selectedItems.size})
                               </button>
+                              )}
                             </>
                           )}
                         </>
@@ -1514,8 +1529,8 @@ export default function AdminPanel() {
                       />
                     </div>
 
-                    {/* Submitter filter — pending queue only */}
-                    {observationFilter === 'pending' && (
+                    {/* Submitter filter — every tab except system imports */}
+                    {observationFilter !== 'system-imports' && (
                       <div className="relative md:w-72" ref={submitterDropdownRef}>
                         <button
                           type="button"
@@ -1582,7 +1597,7 @@ export default function AdminPanel() {
                                 <div className="p-4 text-center text-sm text-gray-500">Loading users...</div>
                               ) : submitters.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-gray-500">
-                                  No users with pending observations
+                                  No users with {observationFilter === 'all' ? '' : `${observationFilter} `}observations
                                 </div>
                               ) : (
                                 submitters.map((submitter) => (
@@ -1788,13 +1803,15 @@ export default function AdminPanel() {
                                   </>
                                 )}
                                 
-                                <button
-                                  onClick={() => handleDeleteObservation(obs)}
-                                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition-all ml-auto"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete
-                                </button>
+                                {canDelete && (
+                                  <button
+                                    onClick={() => handleDeleteObservation(obs)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-50 transition-all ml-auto"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1914,7 +1931,7 @@ export default function AdminPanel() {
                         <tbody className="divide-y divide-gray-100 text-sm">
                           {usersList.map((targetUser) => {
                             const isSelf = targetUser._id === user.id;
-                            const isAdminRole = targetUser.role === 'admin';
+                            const isAdminRole = hasAdminAccess(targetUser);
                             const isBanned = targetUser.isBanned;
                             const isActionLoading = actionLoadingStates[targetUser._id] || false;
 
@@ -2000,6 +2017,12 @@ export default function AdminPanel() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right">
                                   <div className="flex items-center justify-end gap-2">
+                                    {!canManageUsers && (
+                                      <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">
+                                        View only
+                                      </span>
+                                    )}
+                                    {canManageUsers && (
                                     <button
                                       onClick={() => openUserProfile(targetUser)}
                                       className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 border bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
@@ -2007,7 +2030,8 @@ export default function AdminPanel() {
                                       <Pencil className="w-3.5 h-3.5" />
                                       Edit
                                     </button>
-                                    {isSelf ? (
+                                    )}
+                                    {canManageUsers && (isSelf ? (
                                       <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">You</span>
                                     ) : isAdminRole ? (
                                       <span className="text-xs text-gray-400 italic font-semibold px-3 py-1">Protected Admin</span>
@@ -2035,7 +2059,7 @@ export default function AdminPanel() {
                                           </>
                                         )}
                                       </button>
-                                    )}
+                                    ))}
                                   </div>
                                 </td>
                               </tr>
@@ -2472,13 +2496,15 @@ export default function AdminPanel() {
                                   Reject
                                 </button>
                               )}
-                              <button
-                                onClick={() => deleteReview(review._id)}
-                                disabled={reviewActionId === review._id}
-                                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all disabled:opacity-50"
-                              >
-                                Delete
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={() => deleteReview(review._id)}
+                                  disabled={reviewActionId === review._id}
+                                  className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition-all disabled:opacity-50"
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2733,7 +2759,8 @@ export default function AdminPanel() {
                           >
                             <option value="user">Volunteer</option>
                             <option value="writer">Writer</option>
-                            <option value="admin">Administrator</option>
+                            <option value="subadmin">Sub Admin</option>
+                            <option value="superadmin">Super Admin</option>
                           </select>
                         </div>
                       </div>

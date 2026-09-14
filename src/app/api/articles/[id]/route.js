@@ -1,4 +1,5 @@
 import { connectDB } from "@/lib/mongodb";
+import { hasAdminAccess } from "@/lib/permissions";
 import Article from "@/models/Article";
 import cloudinary from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
@@ -75,7 +76,7 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "writer" && user.role !== "admin") {
+    if (user.role !== "writer" && !hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only writers and admins can perform this action" },
         { status: 403 }
@@ -205,7 +206,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "writer" && user.role !== "admin") {
+    if (user.role !== "writer" && !hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only writers and admins can perform this action" },
         { status: 403 }

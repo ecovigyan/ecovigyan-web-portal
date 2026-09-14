@@ -3,6 +3,7 @@ import Gallery from "@/models/Gallery";
 import cloudinary from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // PUT - Update gallery item
 export async function PUT(req, { params }) {
@@ -14,7 +15,7 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "writer" && user.role !== "admin") {
+    if (user.role !== "writer" && !hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only writers and admins can perform this action" },
         { status: 403 }
@@ -123,7 +124,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "writer" && user.role !== "admin") {
+    if (user.role !== "writer" && !hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only writers and admins can perform this action" },
         { status: 403 }

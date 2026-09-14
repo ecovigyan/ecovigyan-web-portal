@@ -3,6 +3,7 @@
 import React, { createContext, useContext } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import toast from "react-hot-toast";
+import { isWriterOrAdmin as isWriterOrAdminRole } from "@/lib/permissions";
 
 const AuthContext = createContext(null);
 
@@ -82,7 +83,7 @@ export function AuthProvider({ children }) {
   };
 
   const isWriterOrAdmin = () => {
-    return user && (user.role === "writer" || user.role === "admin");
+    return user && isWriterOrAdminRole(user);
   };
 
   const value = {

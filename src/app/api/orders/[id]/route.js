@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function PUT(req, { params }) {
   try {
@@ -10,7 +11,7 @@ export async function PUT(req, { params }) {
 
     // Check admin authentication
     const { user } = await getAuthenticatedUser();
-    if (!user || user.role !== "admin") {
+    if (!user || !hasAdminAccess(user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

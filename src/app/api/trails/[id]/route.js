@@ -4,6 +4,7 @@ import Trail from "@/models/Trail";
 import User from "@/models/User";
 import mongoose from "mongoose";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // GET - Get a specific trail
 export async function GET(req, { params }) {
@@ -33,13 +34,13 @@ export async function GET(req, { params }) {
     }
 
     // Normal users can only view trails created by admins
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       const trailCreatorId = trail.user._id || trail.user;
       const trailCreator = trail.user.role 
         ? trail.user
         : await User.findById(trailCreatorId).select("role");
       
-      if (!trailCreator || trailCreator.role !== "admin") {
+      if (!trailCreator || !hasAdminAccess(trailCreator)) {
         return NextResponse.json(
           { error: "Trail not found" },
           { status: 404 }
@@ -67,7 +68,7 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only admins can update trails" },
         { status: 403 }
@@ -145,7 +146,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json(
         { error: "Only admins can delete trails" },
         { status: 403 }

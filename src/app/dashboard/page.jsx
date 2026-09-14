@@ -29,6 +29,7 @@ import {
 import toast from 'react-hot-toast';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { ImageWithFallback } from '@/components/ImageWithFallback';
+import { hasAdminAccess } from "@/lib/permissions";
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -195,7 +196,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Admin Redirection Banner */}
-          {user.role === 'admin' && (
+          {hasAdminAccess(user) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -589,7 +590,7 @@ export default function Dashboard() {
 
                               {/* Action Buttons */}
                               <div className="flex gap-2 flex-wrap">
-                                {(user.role === 'admin' || obs.submittedBy?._id === user._id) && (
+                                {(hasAdminAccess(user) || obs.submittedBy?._id === user._id) && (
                                   <button
                                     onClick={() => handleDeleteObservation(obs)}
                                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition-all ml-auto"

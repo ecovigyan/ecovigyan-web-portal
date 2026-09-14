@@ -4,6 +4,7 @@ import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { sendMushroomApprovedEmail } from "@/lib/mushroomApprovalEmail";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export async function GET(req, { params }) {
   try {
@@ -15,7 +16,7 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "admin") {
+    if (!hasAdminAccess(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -52,7 +53,7 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    if (!hasAdminAccess(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -218,7 +219,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    if (!hasAdminAccess(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

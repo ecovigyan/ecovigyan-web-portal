@@ -4,6 +4,7 @@ import Mushroom from "@/models/Mushroom";
 import User from "@/models/User";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { sendMushroomApprovedEmail } from "@/lib/mushroomApprovalEmail";
+import { hasAdminAccess } from "@/lib/permissions";
 
 // Bulk operations endpoint for efficient batch processing
 export async function POST(req) {
@@ -16,7 +17,7 @@ export async function POST(req) {
       return NextResponse.json({ error: error || "Unauthorized" }, { status: 401 });
     }
 
-    if (admin.role !== "admin") {
+    if (!hasAdminAccess(admin)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
