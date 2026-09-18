@@ -64,3 +64,29 @@ export async function getRatingDistribution(productId) {
 
   return distribution;
 }
+
+// Once per server instance: remove the plain unique (product, user) index
+// that predates guest reviews. With it in place every guest review counts as
+// user: null, so the second guest review on a product fails as a duplicate.
+// Its replacement, "product_1_user_1_members", is partial and is created here
+// straight after the drop, since the two cannot be relied on to coexist.
+let legacyIndexDropped = null;
+
+export function dropLegacyReviewIndex() {
+  if (!legacyIndexDropped) {
+    legacyIndexDropped = (async () => {
+      try {
+        await Review.collection.dropIndex("product_1_user_1");
+      } catch (error) {
+        // 27 = IndexNotFound, 26 = NamespaceNotFound: already migrated, or
+        // the collection does not exist yet. Anything else is a real failure.
+        if (error?.code !== 27 && error?.code !== 26) {
+          legacyIndexDropped = null;
+          throw error;
+        }
+      }
+      await Review.createIndexes();
+    })();
+  }
+  return legacyIndexDropped;
+}

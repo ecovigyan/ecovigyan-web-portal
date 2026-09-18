@@ -758,7 +758,7 @@ export function ReviewObservationModal({ isOpen, onClose, observation, onSave, o
                         placeholder="Explain why this observation was rejected (e.g., poor image quality, insufficient data, misidentification)..."
                       />
                       <div className="flex gap-2 mt-2 flex-wrap">
-                        {['Not a fungi', 'Duplicate observation'].map((reason) => (
+                        {['Not a fungi', 'Duplicate observation', 'Unclear photo'].map((reason) => (
                           <button
                             key={reason}
                             type="button"
