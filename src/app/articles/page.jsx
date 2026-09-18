@@ -195,16 +195,9 @@ export default function ArticlesPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white/90 text-sm font-medium mb-6">
-              <BookOpen className="w-4 h-4" />
-              <span>Environmental Insights</span>
-            </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 font-serif">
               ARTICLES & STORIES
             </h1>
-            <p className="text-xl md:text-2xl text-emerald-50 max-w-4xl mx-auto leading-relaxed mb-8">
-              Explore our collection of environmental research, student experiences, and conservation stories from the field.
-            </p>
 
             {/* Writer/Admin Create Button */}
             {isWriterOrAdmin() && (

@@ -324,10 +324,6 @@ export default function DonatePage() {
                         <span className="font-mono font-bold text-emerald-950">62948388 (Linked Mobile/VPA)</span>
                       </div>
                     </div>
-
-                    <p className="text-center text-sm text-red-600 font-medium mt-6 bg-red-50 py-3 px-4 rounded-xl border border-red-200">
-                      **Please verify the beneficiary name before proceeding.**
-                    </p>
                   </div>
                 </div>
               </motion.div>
