@@ -1,13 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { FileText, ExternalLink, Download, Calendar, FolderOpen, Search, Sparkles } from 'lucide-react';
+import { FileText, ExternalLink, Download, Calendar } from 'lucide-react';
 
 export default function ReportsPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-
   const reports = [
     {
       id: '1',
@@ -71,16 +68,6 @@ export default function ReportsPage() {
     }
   ];
 
-  const categories = ['All', 'Wipro Earthian', 'Citizen Science', 'Annual Report', 'Research'];
-
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         report.year.includes(searchTerm) ||
-                         report.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || report.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
   const getCategoryColor = (category) => {
     switch (category) {
       case 'Wipro Earthian':
@@ -112,62 +99,18 @@ export default function ReportsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white/90 text-sm font-medium mb-6">
-              <FolderOpen className="w-4 h-4" />
-              <span>Public Records</span>
-            </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 font-serif">
+            <h1 className="text-5xl md:text-6xl font-bold text-white font-serif">
               Reports & Documents
             </h1>
-            <p className="text-xl md:text-2xl text-emerald-50 max-w-4xl mx-auto leading-relaxed">
-              Access our annual reports, research findings, and program documentation. All resources are freely available to support transparency and knowledge sharing.
-            </p>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Search & Filter Bar */}
-      <section className="py-8 bg-white border-b border-emerald-100 sticky top-20 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-            {/* Search Bar */}
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search reports by title, year, or keyword..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-emerald-50/50 border-2 border-emerald-100 rounded-xl py-3 pl-12 pr-4 text-emerald-900 placeholder:text-emerald-400 focus:outline-none focus:border-emerald-400 transition-colors"
-              />
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap transition-all ${
-                    selectedCategory === category
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
-                      : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
       {/* Reports Grid */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {filteredReports.length > 0 ? (
-            <div className="grid gap-6">
-              {filteredReports.map((report, index) => (
+          <div className="grid gap-6">
+              {reports.map((report, index) => (
                 <motion.div
                   key={report.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -234,69 +177,9 @@ export default function ReportsPage() {
                 </motion.div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-20">
-              <FileText className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">No reports found</h3>
-              <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-            </div>
-          )}
         </div>
       </section>
 
-      {/* Info Section */}
-      <section className="py-16 bg-gradient-to-br from-emerald-50 to-teal-50 border-y border-emerald-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100"
-            >
-              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4">
-                <FolderOpen className="w-6 h-6 text-emerald-600" />
-              </div>
-              <h3 className="text-xl font-bold text-emerald-900 mb-2">Open Access</h3>
-              <p className="text-emerald-800/70">
-                All reports are freely available to support research, education, and transparency in environmental work.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100"
-            >
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                <Calendar className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-emerald-900 mb-2">Annual Updates</h3>
-              <p className="text-emerald-800/70">
-                We publish comprehensive reports annually to document our programs, research, and community impact.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100"
-            >
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-                <FileText className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-emerald-900 mb-2">Request Documents</h3>
-              <p className="text-emerald-800/70">
-                Need a specific document or report? Contact us at <a href="mailto:ecovigyan@gmail.com" className="text-emerald-600 font-semibold hover:underline">ecovigyan@gmail.com</a>
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
