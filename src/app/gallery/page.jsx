@@ -687,17 +687,25 @@ function EcoArtGalleryContent() {
                   </div>
 
                   <div className="space-y-6">
-                    <div>
-                      <h2 className="text-4xl font-bold text-emerald-900 mb-2 font-serif">
-                        {viewingImage.title || "Student Artwork"}
-                      </h2>
-                      {viewingImage.category && (
-                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 text-sm font-semibold">
-                          <Award className="w-4 h-4" />
-                          {viewingImage.category}
-                        </span>
-                      )}
-                    </div>
+                    {/* No generic "Student Artwork" fallback heading: on a phone
+                        it took two lines of large serif type and pushed the
+                        description, artists and school below the fold. A real
+                        title is still shown when the artwork has one. */}
+                    {(viewingImage.title || viewingImage.category) && (
+                      <div>
+                        {viewingImage.title && (
+                          <h2 className="text-2xl md:text-4xl font-bold text-emerald-900 mb-2 font-serif">
+                            {viewingImage.title}
+                          </h2>
+                        )}
+                        {viewingImage.category && (
+                          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 text-sm font-semibold">
+                            <Award className="w-4 h-4" />
+                            {viewingImage.category}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {viewingImage.description && (
                       <div className="bg-emerald-50 p-4 rounded-2xl">

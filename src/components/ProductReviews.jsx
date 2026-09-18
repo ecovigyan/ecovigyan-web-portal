@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, Clock, XCircle, MessageSquare } from "lucide-react";
+import { Loader2, Clock, XCircle, MessageSquare, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
 import StarRating from "./StarRating";
 
 export default function ProductReviews({ productId, averageRating = 0, reviewCount = 0 }) {
-  const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  // Reviewing needs no account. When someone is signed in we prefill their
+  // name and the server ties the review to their account.
+  const { user } = useAuth();
 
   const [reviews, setReviews] = useState([]);
   const [distribution, setDistribution] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
@@ -21,9 +21,20 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
 
   // Form state
   const [rating, setRating] = useState(0);
-  const [title, setTitle] = useState("");
+  const [reviewerName, setReviewerName] = useState("");
+  const [occupation, setOccupation] = useState("");
   const [comment, setComment] = useState("");
+  // Honeypot — hidden from people, filled in by bots; the server discards
+  // any submission that has it.
+  const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // A guest has no account to look their review up by, so confirm the
+  // submission locally instead of showing the form again.
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (user?.name) setReviewerName((current) => current || user.name);
+  }, [user]);
 
   const loadReviews = useCallback(async () => {
     try {
@@ -56,6 +67,10 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
       toast.error("Please pick a star rating");
       return;
     }
+    if (!reviewerName.trim() || !occupation.trim() || !comment.trim()) {
+      toast.error("Please fill in your name, occupation and review");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -63,7 +78,7 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ rating, title, comment }),
+        body: JSON.stringify({ rating, reviewerName, occupation, comment, website }),
       });
 
       const data = await res.json();
@@ -71,8 +86,9 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
 
       toast.success(data.message || "Review submitted for approval");
       setRating(0);
-      setTitle("");
+      setOccupation("");
       setComment("");
+      setSubmitted(true);
       await loadReviews();
     } catch (error) {
       toast.error(error.message || "Failed to submit review");
@@ -122,17 +138,15 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
       </div>
 
       {/* WRITE A REVIEW */}
-      {!isAuthenticated() ? (
-        <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 mb-8 text-center">
-          <p className="text-sm font-medium text-stone-600 mb-3">
-            Sign in to leave a review
-          </p>
-          <button
-            onClick={() => router.push("/login")}
-            className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all"
-          >
-            Sign In
-          </button>
+      {submitted && !myReview ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-8 flex gap-3">
+          <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-emerald-800">Thank you for your review</p>
+            <p className="text-xs text-emerald-700 mt-1">
+              It will appear here once an admin approves it.
+            </p>
+          </div>
         </div>
       ) : myReview ? (
         // The user already has a review — show its moderation state instead of
@@ -190,29 +204,59 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
             <StarRating value={rating} onChange={setRating} size="lg" />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-stone-700 mb-2 uppercase tracking-wider">
-              Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={120}
-              placeholder="Sum it up in a line"
-              className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
-            />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-2 uppercase tracking-wider">
+                Your Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={reviewerName}
+                onChange={(e) => setReviewerName(e.target.value)}
+                maxLength={80}
+                required
+                placeholder="e.g. Priya Sharma"
+                className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-700 mb-2 uppercase tracking-wider">
+                Occupation <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                maxLength={80}
+                required
+                placeholder="e.g. Teacher, Student, Farmer"
+                className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
           </div>
+
+          {/* Honeypot: off-screen and skipped by keyboard and screen readers */}
+          <input
+            type="text"
+            name="website"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="absolute -left-[9999px] w-px h-px opacity-0"
+          />
 
           <div>
             <label className="block text-xs font-bold text-stone-700 mb-2 uppercase tracking-wider">
-              Your Review
+              Your Review <span className="text-red-500">*</span>
             </label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               maxLength={2000}
               rows={4}
+              required
               placeholder="What did you think of this product?"
               className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all resize-none"
             />
@@ -251,15 +295,14 @@ export default function ProductReviews({ productId, averageRating = 0, reviewCou
             <div key={review._id} className="border-b border-stone-100 pb-5 last:border-0">
               <div className="flex items-center gap-3 mb-1.5">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-black text-emerald-700 overflow-hidden shrink-0">
-                  {review.user?.dp ? (
-                    <img src={review.user.dp} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    (review.user?.name || "?").charAt(0).toUpperCase()
-                  )}
+                  {(review.reviewerName || review.user?.name || "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-emerald-950 truncate">
-                    {review.user?.name || review.user?.username || "Anonymous"}
+                    {review.reviewerName || review.user?.name || "Anonymous"}
+                    {review.occupation && (
+                      <span className="font-medium text-stone-500"> · {review.occupation}</span>
+                    )}
                   </p>
                   <div className="flex items-center gap-2">
                     <StarRating value={review.rating} size="sm" />
