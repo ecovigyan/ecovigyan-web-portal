@@ -2439,8 +2439,16 @@ export default function AdminPanel() {
                                   {review.product?.name || 'Unknown product'}
                                 </p>
                                 <p className="text-xs text-gray-505">
-                                  by {review.user?.name || review.user?.username || 'Unknown'}
-                                  {review.user?.email && ` · ${review.user.email}`}
+                                  by <span className="font-semibold text-gray-700">{review.reviewerName || review.user?.name || 'Unknown'}</span>
+                                  {review.occupation && ` · ${review.occupation}`}
+                                  {/* Reviews need no account, so say which kind this is —
+                                      a guest's name is whatever they typed. */}
+                                  <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    review.user ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {review.user ? 'Member' : 'Guest'}
+                                  </span>
+                                  {review.user?.email && <span className="block mt-0.5">{review.user.email}</span>}
                                 </p>
                               </div>
                               <div className="shrink-0">{getStatusBadge(review.status)}</div>
@@ -2569,7 +2577,7 @@ export default function AdminPanel() {
 
               {/* Presets */}
               <div className="flex gap-2 mb-4 flex-wrap">
-                {['Not a fungi', 'Duplicate observation'].map((reason) => (
+                {['Not a fungi', 'Duplicate observation', 'Unclear photo'].map((reason) => (
                   <button
                     key={reason}
                     type="button"
