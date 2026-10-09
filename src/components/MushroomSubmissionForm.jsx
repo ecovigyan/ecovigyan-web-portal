@@ -299,7 +299,7 @@ export default function MushroomSubmissionForm({
       previewReader.readAsDataURL(file);
     };
 
-    if (isCamera) showPreview();
+    showPreview();
 
     // Extract EXIF data - read as ArrayBuffer to preserve all binary data
     try {
@@ -360,22 +360,24 @@ export default function MushroomSubmissionForm({
         }
         // If no EXIF date/time, device date/time was already set above
       } else {
-        // Gallery photo: EXIF GPS is mandatory — stripped photos are rejected
+        // Gallery photo. Missing EXIF GPS used to discard the file outright,
+        // which made this option unusable on Windows: copying off a phone,
+        // downloading, or editing a photo strips GPS, so nearly every desktop
+        // file was rejected. The tile is superadmin-only and admins can set a
+        // location by map, city or coordinates, so fall back to that instead.
         if (!gps || !gps.latitude || !gps.longitude) {
-          toast.error("EXIF data has been removed. Please capture a live photo.", {
+          setHasExifGps(false);
+          setLocationInputMethod("map");
+          toast("No location stored in this photo — set it manually below.", {
+            icon: "ℹ️",
             duration: 5000,
           });
-          setImageFile(null);
-          setIsFromCamera(false);
-          inputElement.value = "";
-          return;
+        } else {
+          onLocationSelect?.(gps);
+          setHasExifGps(true);
+          setLocationInputMethod("map");
+          toast.success(`Location found in EXIF: ${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`);
         }
-
-        onLocationSelect?.(gps);
-        setHasExifGps(true);
-        setLocationInputMethod("map");
-        toast.success(`Location found in EXIF: ${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`);
-        showPreview();
 
         if (dateTime) {
           setExifDateTime(dateTime);
@@ -390,10 +392,11 @@ export default function MushroomSubmissionForm({
       if (isCamera) {
         toast.error("Could not read EXIF data from image");
       } else {
-        toast.error("EXIF data has been removed. Please capture a live photo.");
-        setImageFile(null);
-        setIsFromCamera(false);
-        inputElement.value = "";
+        // Keep the file — the admin can still set the location by hand
+        toast("Could not read location from this photo — set it manually below.", {
+          icon: "ℹ️",
+          duration: 5000,
+        });
       }
     } finally {
       setIsExtractingExif(false);
@@ -595,7 +598,7 @@ toast.success(data.message || "Mushroom submitted successfully!");
             </p>
             {isAdmin && (
               <p className="text-[9px] sm:text-[10px] text-emerald-700 text-center leading-relaxed">
-                ⚠️ <strong>Note:</strong> Gallery uploads must still contain EXIF GPS data. Photos with EXIF stripped will be rejected.
+                ⚠️ <strong>Note:</strong> Gallery uploads use the photo's EXIF location when it has one. If it does not, set the location yourself below.
               </p>
             )}
           </div>
@@ -686,7 +689,7 @@ toast.success(data.message || "Mushroom submitted successfully!");
                     Upload from Gallery / Files
                   </p>
                   <p className="text-[10px] text-stone-500 font-medium mt-1 text-center px-2">
-                    Note: Some mobile browsers may strip EXIF data from gallery images
+                    Location is read from the photo's EXIF when present, otherwise set it below
                   </p>
                   <input
                     type="file"
