@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 // Delete cached model in development to ensure schema changes take effect
 if (process.env.NODE_ENV !== 'production') {
@@ -47,6 +48,9 @@ const userSchema = new mongoose.Schema(
     dp: {
       public_id: String,
       url: String,
+      // "google" pictures are refreshed on every Google login; "custom" (user
+      // upload) and "none" (user removed it) must never be overwritten by it.
+      source: { type: String, enum: ["google", "custom", "none"] },
     },
 
     bio: {
@@ -105,6 +109,16 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+/* ---------------- PASSWORD HASHING ---------------- */
+// Most routes hash before saving; this catches the ones that don't (the
+// mobile API upgrades legacy plain-text passwords on login). Values that are
+// already bcrypt hashes pass through untouched.
+userSchema.pre("save", async function hashPassword() {
+  if (!this.isModified("password") || !this.password) return;
+  if (this.password.startsWith("$2a$") || this.password.startsWith("$2b$")) return;
+  this.password = await bcrypt.hash(this.password, 10);
+});
 
 /* ---------------- SAFE EXPORT ---------------- */
 export default mongoose.models.User || mongoose.model("User", userSchema);

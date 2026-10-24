@@ -45,3 +45,5 @@ temp_interactive_push.bat
 
 # Local server-access notes: never commit (repo is public)
 SERVER_ACCESS.md
+
+exports/

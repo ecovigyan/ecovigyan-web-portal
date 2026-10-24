@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import cloudinary from "@/lib/cloudinary";
+import { hasAdminAccess } from "@/lib/permissions";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import crypto from "crypto";
 
