@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+.env
+.env.local
+.env.*.local
+exports
+memory-bank
+scripts/export-*
+SERVER_ACCESS.md
+*.zip
+*.jpeg
+*.log
+.claude

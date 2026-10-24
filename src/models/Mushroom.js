@@ -23,6 +23,11 @@ const MushroomSchema = new mongoose.Schema(
       longitude: { type: Number, required: true },
     },
 
+    // Set by the mobile API to the first image's URL; the apps read it.
+    thumbnail: {
+      type: String,
+    },
+
     photoDateTime: {
       type: Date,
     },
